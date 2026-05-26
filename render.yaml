@@ -14,6 +14,12 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v4-flash
+      - key: PREFERRED_TRANSLATION_PROVIDER
+        value: auto
       - key: DEEPL_API_KEY
         sync: false
       - key: MATHPIX_APP_ID

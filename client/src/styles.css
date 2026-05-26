@@ -181,6 +181,26 @@ h1 {
   opacity: 0.72;
 }
 
+.secondaryAction {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #287c71;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #164d47;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.secondaryAction:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .iconButton {
   display: inline-grid;
   width: 42px;
@@ -204,6 +224,56 @@ h1 {
 
 .history {
   margin-top: 22px;
+}
+
+.keyPanel {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e4ebe6;
+}
+
+.providerSelect {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.providerSelect button {
+  min-height: 34px;
+  border: 1px solid #d8e2dd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #26342f;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.providerSelect button.active {
+  border-color: #287c71;
+  background: #e5f4f1;
+  color: #164d47;
+}
+
+.keyField {
+  display: grid;
+  gap: 6px;
+  color: #41504a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.keyField input,
+.modelInput {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d8e2dd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #26342f;
 }
 
 .jobItem {

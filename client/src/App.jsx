@@ -41,6 +41,15 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [redrawingId, setRedrawingId] = useState("");
   const [jobs, setJobs] = useState([]);
+  const [keyStatus, setKeyStatus] = useState(null);
+  const [keyForm, setKeyForm] = useState({
+    preferredProvider: "auto",
+    openaiApiKey: "",
+    openaiModel: "gpt-4.1-mini",
+    deepseekApiKey: "",
+    deepseekModel: "deepseek-v4-flash"
+  });
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
   const fileInputRef = useRef(null);
 
   const canExport = job?.status === "completed";
@@ -58,7 +67,22 @@ function App() {
 
   useEffect(() => {
     refreshJobs().catch(() => undefined);
+    refreshKeyStatus().catch(() => undefined);
   }, []);
+
+  async function refreshKeyStatus() {
+    const response = await fetch("/api/settings/model-keys");
+    if (response.ok) {
+      const payload = await response.json();
+      setKeyStatus(payload);
+      setKeyForm((current) => ({
+        ...current,
+        preferredProvider: payload.preferredProvider || "auto",
+        openaiModel: payload.openai?.model || current.openaiModel,
+        deepseekModel: payload.deepseek?.model || current.deepseekModel
+      }));
+    }
+  }
 
   useEffect(() => {
     if (!job?.id || ["completed", "failed"].includes(job.status)) return undefined;
@@ -109,6 +133,32 @@ function App() {
 
   function exportUrl(format) {
     return job?.id ? `/api/jobs/${job.id}/export?format=${format}` : "#";
+  }
+
+  async function saveKeys(event) {
+    event.preventDefault();
+    setIsSavingKeys(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/settings/model-keys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(keyForm)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "保存 Key 失败");
+      setKeyStatus(payload);
+      setKeyForm((current) => ({
+        ...current,
+        openaiApiKey: "",
+        deepseekApiKey: ""
+      }));
+    } catch (keyError) {
+      setError(keyError.message);
+    } finally {
+      setIsSavingKeys(false);
+    }
   }
 
   async function redrawImage(imageId) {
@@ -211,6 +261,66 @@ function App() {
               {isUploading ? <Loader2 className="spin" size={18} /> : <ArrowRight size={18} />}
               开始翻译
             </button>
+
+            <form className="keyPanel" onSubmit={saveKeys}>
+              <div className="sectionTitle">模型 Key</div>
+              <div className="providerSelect">
+                {["auto", "openai", "deepseek"].map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    className={keyForm.preferredProvider === provider ? "active" : ""}
+                    onClick={() =>
+                      setKeyForm((current) => ({ ...current, preferredProvider: provider }))
+                    }
+                  >
+                    {provider}
+                  </button>
+                ))}
+              </div>
+              <label className="keyField">
+                OpenAI
+                <input
+                  type="password"
+                  placeholder={keyStatus?.openai?.configured ? keyStatus.openai.keyPreview : "sk-..."}
+                  value={keyForm.openaiApiKey}
+                  onChange={(event) =>
+                    setKeyForm((current) => ({ ...current, openaiApiKey: event.target.value }))
+                  }
+                />
+              </label>
+              <input
+                className="modelInput"
+                value={keyForm.openaiModel}
+                onChange={(event) =>
+                  setKeyForm((current) => ({ ...current, openaiModel: event.target.value }))
+                }
+              />
+              <label className="keyField">
+                DeepSeek
+                <input
+                  type="password"
+                  placeholder={
+                    keyStatus?.deepseek?.configured ? keyStatus.deepseek.keyPreview : "sk-..."
+                  }
+                  value={keyForm.deepseekApiKey}
+                  onChange={(event) =>
+                    setKeyForm((current) => ({ ...current, deepseekApiKey: event.target.value }))
+                  }
+                />
+              </label>
+              <input
+                className="modelInput"
+                value={keyForm.deepseekModel}
+                onChange={(event) =>
+                  setKeyForm((current) => ({ ...current, deepseekModel: event.target.value }))
+                }
+              />
+              <button className="secondaryAction" type="submit" disabled={isSavingKeys}>
+                {isSavingKeys ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
+                保存 Key
+              </button>
+            </form>
 
             {error && (
               <p className="notice error">

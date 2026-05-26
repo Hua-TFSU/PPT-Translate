@@ -11,6 +11,7 @@ import {
   prepareSegmentsForTranslation
 } from "./formulaGuard.js";
 import { createRedrawnFigure } from "./redraw.js";
+import { getModelKeyStatus, updateModelKeys } from "./runtimeConfig.js";
 import { translateSegments } from "./translator.js";
 
 describe("document pipeline", () => {
@@ -96,6 +97,21 @@ describe("document pipeline", () => {
     const check = checkFormulaConsistency("ρ = 0,38 if 1140 ≤ t ≤ 1259", "其中：价格为 0.38");
     expect(check.ok).toBe(false);
     expect(check.missingFormulaCount).toBe(1);
+  });
+
+  it("masks runtime model keys", () => {
+    const status = updateModelKeys({
+      preferredProvider: "deepseek",
+      deepseekApiKey: "sk-deepseek-test-key",
+      deepseekModel: "deepseek-v4-flash"
+    });
+
+    expect(status.preferredProvider).toBe("deepseek");
+    expect(status.deepseek.configured).toBe(true);
+    expect(status.deepseek.keyPreview).toBe("sk-...-key");
+    expect(JSON.stringify(getModelKeyStatus())).not.toContain("deepseek-test");
+
+    updateModelKeys({ clearDeepSeek: true, preferredProvider: "auto" });
   });
 
   it("exports completed jobs as Markdown and DOCX", async () => {

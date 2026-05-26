@@ -8,6 +8,7 @@ import { createJob, getJob, listJobs, toPublicJob, updateJob } from "./lib/jobs.
 import { buildDocx, buildMarkdown } from "./services/exporters.js";
 import { extractDocument } from "./services/extractors.js";
 import { createRedrawnFigure } from "./services/redraw.js";
+import { getModelKeyStatus, updateModelKeys } from "./services/runtimeConfig.js";
 import { translateSegments } from "./services/translator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,14 @@ app.get("/api/languages", (_request, response) => {
       { source: "en", target: "zh", label: "英译中" }
     ]
   });
+});
+
+app.get("/api/settings/model-keys", (_request, response) => {
+  response.json(getModelKeyStatus());
+});
+
+app.put("/api/settings/model-keys", (request, response) => {
+  response.json(updateModelKeys(request.body || {}));
 });
 
 app.get("/api/jobs", (_request, response) => {

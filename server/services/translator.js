@@ -1,4 +1,5 @@
 import { applyFormulaGuard, prepareSegmentsForTranslation } from "./formulaGuard.js";
+import { getProviderConfig } from "./runtimeConfig.js";
 
 const languageNames = {
   zh: "Chinese",
@@ -15,9 +16,22 @@ export async function translateSegments(segments, sourceLang, targetLang) {
     segments.filter((segment) => segment.sourceText?.trim())
   );
   if (cleanSegments.length === 0) return [];
+  const providerConfig = getProviderConfig();
 
-  if (process.env.OPENAI_API_KEY) {
-    return translateWithOpenAI(cleanSegments, sourceLang, targetLang);
+  if (providerConfig.preferredProvider === "openai" && providerConfig.openai.apiKey) {
+    return translateWithOpenAI(cleanSegments, sourceLang, targetLang, providerConfig.openai);
+  }
+
+  if (providerConfig.preferredProvider === "deepseek" && providerConfig.deepseek.apiKey) {
+    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, providerConfig.deepseek);
+  }
+
+  if (providerConfig.openai.apiKey) {
+    return translateWithOpenAI(cleanSegments, sourceLang, targetLang, providerConfig.openai);
+  }
+
+  if (providerConfig.deepseek.apiKey) {
+    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, providerConfig.deepseek);
   }
 
   if (process.env.DEEPL_API_KEY) {
@@ -29,15 +43,15 @@ export async function translateSegments(segments, sourceLang, targetLang) {
   }));
 }
 
-async function translateWithOpenAI(segments, sourceLang, targetLang) {
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+async function translateWithOpenAI(segments, sourceLang, targetLang, config) {
+  const model = config.model;
   const translated = [];
 
   for (const batch of chunk(segments, 12)) {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -114,6 +128,69 @@ async function translateWithOpenAI(segments, sourceLang, targetLang) {
   return translated;
 }
 
+async function translateWithDeepSeek(segments, sourceLang, targetLang, config) {
+  const translated = [];
+
+  for (const batch of chunk(segments, 12)) {
+    const response = await fetch(config.apiUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a professional presentation translator. Translate faithfully. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve markdown, numbers, names, and slide structure. Return only valid JSON."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              sourceLanguage: languageNames[sourceLang] || sourceLang,
+              targetLanguage: languageNames[targetLang] || targetLang,
+              outputSchema: {
+                translations: [{ id: "string", translatedText: "string" }]
+              },
+              items: batch.map(({ id, sourceText, location, kind }) => ({
+                id,
+                location,
+                kind,
+                text: sourceText
+              }))
+            })
+          }
+        ],
+        response_format: { type: "json_object" },
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`DeepSeek translation failed: ${response.status} ${detail}`);
+    }
+
+    const payload = await response.json();
+    const outputText = payload.choices?.[0]?.message?.content || "";
+    const parsed = parseJsonObject(outputText);
+    const byId = new Map((parsed.translations || []).map((item) => [item.id, item.translatedText]));
+
+    translated.push(
+      ...batch.map((segment) => ({
+        ...applyFormulaGuard(
+          { ...segment, provider: `deepseek:${config.model}` },
+          byId.get(segment.id) || segment.sourceText
+        )
+      }))
+    );
+  }
+
+  return translated;
+}
+
 async function translateWithDeepL(segments, sourceLang, targetLang) {
   const deeplUrl = process.env.DEEPL_API_URL || "https://api-free.deepl.com/v2/translate";
   const params = new URLSearchParams();
@@ -165,4 +242,14 @@ function collectResponseText(payload) {
     .filter((item) => item.type === "output_text" || item.text)
     .map((item) => item.text)
     .join("");
+}
+
+function parseJsonObject(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = String(text || "").match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("Model did not return a JSON object");
+    return JSON.parse(match[0]);
+  }
 }

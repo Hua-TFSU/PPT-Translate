@@ -12,6 +12,7 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
 - Translation provider chain: OpenAI, DeepL, then a safe unconfigured fallback.
 - Formula guard for math-heavy PDFs: formula-like snippets are replaced with placeholders before translation and restored exactly afterward, with a consistency summary in exports.
+- Runtime key API for OpenAI and DeepSeek translation providers.
 - Export API: JSON, Markdown, DOCX.
 - Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
 - Render deployment blueprint through `render.yaml`.
@@ -61,12 +62,31 @@ curl -X POST http://localhost:4000/api/jobs/<jobId>/images/<imageId>/redraw
 curl -L http://localhost:4000/api/jobs/<jobId>/images/<imageId>/redraw.svg -o redrawn.svg
 ```
 
+### Update Model Keys
+
+Keys are stored in server memory and full key values are never returned by the API.
+
+```bash
+curl -X PUT http://localhost:4000/api/settings/model-keys \
+  -H "Content-Type: application/json" \
+  -d '{
+    "preferredProvider": "deepseek",
+    "openaiApiKey": "sk-...",
+    "openaiModel": "gpt-4.1-mini",
+    "deepseekApiKey": "sk-...",
+    "deepseekModel": "deepseek-v4-flash"
+  }'
+```
+
 ## Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
 | `OPENAI_API_KEY` | Enables OpenAI translation. |
 | `OPENAI_MODEL` | OpenAI model name, defaults to `gpt-4.1-mini`. |
+| `DEEPSEEK_API_KEY` | Enables DeepSeek translation. |
+| `DEEPSEEK_MODEL` | DeepSeek model name, defaults to `deepseek-v4-flash`. |
+| `PREFERRED_TRANSLATION_PROVIDER` | `auto`, `openai`, or `deepseek`. |
 | `DEEPL_API_KEY` | Enables DeepL translation if OpenAI is not configured. |
 | `MATHPIX_APP_ID` / `MATHPIX_APP_KEY` | Enables dedicated Mathpix OCR for scanned PDFs and formulas. |
 | `ENABLE_LOCAL_OCR` | Enables slower local OCR for extracted PPT image assets. |
