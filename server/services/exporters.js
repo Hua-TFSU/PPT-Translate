@@ -29,6 +29,15 @@ export function buildMarkdown(job) {
     lines.push("");
   }
 
+  if (result.formulaSummary) {
+    lines.push("## Formula Consistency", "");
+    lines.push(`- OK: ${result.formulaSummary.ok}`);
+    lines.push(`- Checked segments: ${result.formulaSummary.checkedSegments}`);
+    lines.push(`- Source formulas: ${result.formulaSummary.totalFormulas}`);
+    lines.push(`- Missing formulas: ${result.formulaSummary.missingFormulas}`);
+    lines.push("");
+  }
+
   lines.push("## Segments", "");
   for (const segment of result.segments || []) {
     lines.push(`### ${segment.location}`, "");
@@ -36,6 +45,12 @@ export function buildMarkdown(job) {
     lines.push(segment.sourceText || "", "");
     lines.push("**Translation**", "");
     lines.push(segment.translatedText || "", "");
+    if (segment.formulaCheck) {
+      lines.push(
+        `Formula check: ${segment.formulaCheck.ok ? "OK" : "Mismatch"} (${segment.formulaCheck.sourceFormulaCount} source formulas, ${segment.formulaCheck.missingFormulaCount} missing)`,
+        ""
+      );
+    }
   }
 
   if (result.images?.length) {
@@ -79,6 +94,14 @@ export async function buildDocx(job) {
     for (const warning of result.warnings) {
       children.push(new Paragraph({ text: warning, bullet: { level: 0 } }));
     }
+  }
+
+  if (result.formulaSummary) {
+    children.push(new Paragraph({ text: "Formula Consistency", heading: HeadingLevel.HEADING_1 }));
+    children.push(new Paragraph(`OK: ${result.formulaSummary.ok}`));
+    children.push(new Paragraph(`Checked segments: ${result.formulaSummary.checkedSegments}`));
+    children.push(new Paragraph(`Source formulas: ${result.formulaSummary.totalFormulas}`));
+    children.push(new Paragraph(`Missing formulas: ${result.formulaSummary.missingFormulas}`));
   }
 
   children.push(new Paragraph({ text: "Segments", heading: HeadingLevel.HEADING_1 }));

@@ -1,3 +1,5 @@
+import { applyFormulaGuard, prepareSegmentsForTranslation } from "./formulaGuard.js";
+
 const languageNames = {
   zh: "Chinese",
   en: "English",
@@ -9,7 +11,9 @@ const languageNames = {
 };
 
 export async function translateSegments(segments, sourceLang, targetLang) {
-  const cleanSegments = segments.filter((segment) => segment.sourceText?.trim());
+  const cleanSegments = prepareSegmentsForTranslation(
+    segments.filter((segment) => segment.sourceText?.trim())
+  );
   if (cleanSegments.length === 0) return [];
 
   if (process.env.OPENAI_API_KEY) {
@@ -21,9 +25,7 @@ export async function translateSegments(segments, sourceLang, targetLang) {
   }
 
   return cleanSegments.map((segment) => ({
-    ...segment,
-    translatedText: segment.sourceText,
-    provider: "unconfigured"
+    ...applyFormulaGuard({ ...segment, provider: "unconfigured" }, segment.sourceText)
   }));
 }
 
@@ -44,7 +46,7 @@ async function translateWithOpenAI(segments, sourceLang, targetLang) {
           {
             role: "system",
             content:
-              "You are a professional presentation translator. Translate faithfully, preserve formulas, markdown, numbers, names, and slide structure. Return only valid JSON."
+              "You are a professional presentation translator. Translate faithfully. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve markdown, numbers, names, and slide structure. Return only valid JSON."
           },
           {
             role: "user",
@@ -101,9 +103,10 @@ async function translateWithOpenAI(segments, sourceLang, targetLang) {
 
     translated.push(
       ...batch.map((segment) => ({
-        ...segment,
-        translatedText: byId.get(segment.id) || segment.sourceText,
-        provider: `openai:${model}`
+        ...applyFormulaGuard(
+          { ...segment, provider: `openai:${model}` },
+          byId.get(segment.id) || segment.sourceText
+        )
       }))
     );
   }
@@ -134,9 +137,10 @@ async function translateWithDeepL(segments, sourceLang, targetLang) {
 
   const payload = await response.json();
   return segments.map((segment, index) => ({
-    ...segment,
-    translatedText: payload.translations?.[index]?.text || segment.sourceText,
-    provider: "deepl"
+    ...applyFormulaGuard(
+      { ...segment, provider: "deepl" },
+      payload.translations?.[index]?.text || segment.sourceText
+    )
   }));
 }
 

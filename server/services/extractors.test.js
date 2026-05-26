@@ -5,6 +5,11 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { buildDocx, buildMarkdown } from "./exporters.js";
 import { extractDocument } from "./extractors.js";
+import {
+  applyFormulaGuard,
+  checkFormulaConsistency,
+  prepareSegmentsForTranslation
+} from "./formulaGuard.js";
 import { createRedrawnFigure } from "./redraw.js";
 import { translateSegments } from "./translator.js";
 
@@ -64,6 +69,33 @@ describe("document pipeline", () => {
 
     expect(translated[0].translatedText).toBe("Hello world");
     expect(translated[0].provider).toBe("unconfigured");
+  });
+
+  it("restores formulas exactly after placeholder translation", () => {
+    const [prepared] = prepareSegmentsForTranslation([
+      {
+        id: "seg_formula",
+        location: "Page 3",
+        sourceText: "Where:\nρ = 0,38 if 1140 ≤ t ≤ 1259\nPMax ≥ PGt"
+      }
+    ]);
+
+    expect(prepared.sourceText).toContain("[[FORMULA_");
+
+    const translated = applyFormulaGuard(
+      { ...prepared, provider: "mock" },
+      "其中：\n[[FORMULA_0]]\n[[FORMULA_1]]"
+    );
+
+    expect(translated.translatedText).toContain("ρ = 0,38 if 1140 ≤ t ≤ 1259");
+    expect(translated.translatedText).toContain("PMax ≥ PGt");
+    expect(translated.formulaCheck.ok).toBe(true);
+  });
+
+  it("reports formula mismatches", () => {
+    const check = checkFormulaConsistency("ρ = 0,38 if 1140 ≤ t ≤ 1259", "其中：价格为 0.38");
+    expect(check.ok).toBe(false);
+    expect(check.missingFormulaCount).toBe(1);
   });
 
   it("exports completed jobs as Markdown and DOCX", async () => {

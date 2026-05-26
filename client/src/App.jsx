@@ -46,6 +46,7 @@ function App() {
   const canExport = job?.status === "completed";
   const segments = useMemo(() => job?.result?.segments || [], [job]);
   const imageItems = useMemo(() => job?.result?.images || [], [job]);
+  const formulaSummary = job?.result?.formulaSummary;
 
   async function refreshJobs() {
     const response = await fetch("/api/jobs");
@@ -244,6 +245,9 @@ function App() {
                 <div className="sectionTitle">译文</div>
                 <p className="muted">
                   {job ? `${statusLabel(job.status)} · ${job.filename}` : "等待上传"}
+                  {formulaSummary
+                    ? ` · 公式${formulaSummary.ok ? "一致" : "有差异"} ${formulaSummary.totalFormulas - formulaSummary.missingFormulas}/${formulaSummary.totalFormulas}`
+                    : ""}
                 </p>
               </div>
               <div className="exportButtons">

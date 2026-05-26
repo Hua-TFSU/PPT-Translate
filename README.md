@@ -11,6 +11,7 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - PDF text-layer extraction through `pdfjs-dist`.
 - Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
 - Translation provider chain: OpenAI, DeepL, then a safe unconfigured fallback.
+- Formula guard for math-heavy PDFs: formula-like snippets are replaced with placeholders before translation and restored exactly afterward, with a consistency summary in exports.
 - Export API: JSON, Markdown, DOCX.
 - Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
 - Render deployment blueprint through `render.yaml`.

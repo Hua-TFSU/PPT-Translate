@@ -258,6 +258,13 @@ async function processJob(jobId) {
     if (translatedSegments.some((segment) => segment.provider === "unconfigured")) {
       warnings.push("No translation provider is configured, so original text was preserved.");
     }
+    const formulaWarnings = translatedSegments
+      .filter((segment) => segment.formulaCheck && !segment.formulaCheck.ok)
+      .map(
+        (segment) =>
+          `${segment.location} has ${segment.formulaCheck.missingFormulaCount} formula restoration mismatch(es).`
+      );
+    warnings.push(...formulaWarnings);
 
     updateJob(jobId, {
       status: "completed",
@@ -268,6 +275,7 @@ async function processJob(jobId) {
         warnings,
         segments: translatedSegments,
         images: translatedImages,
+        formulaSummary: summarizeFormulaChecks(translatedSegments),
         completedAt: new Date().toISOString()
       }
     });
@@ -279,6 +287,18 @@ async function processJob(jobId) {
       error: error.message
     });
   }
+}
+
+function summarizeFormulaChecks(segments = []) {
+  const checks = segments.map((segment) => segment.formulaCheck).filter(Boolean);
+  const totalFormulas = checks.reduce((sum, check) => sum + check.sourceFormulaCount, 0);
+  const missingFormulas = checks.reduce((sum, check) => sum + check.missingFormulaCount, 0);
+  return {
+    ok: missingFormulas === 0,
+    checkedSegments: checks.length,
+    totalFormulas,
+    missingFormulas
+  };
 }
 
 function attachImageTranslations(images = [], segments = []) {

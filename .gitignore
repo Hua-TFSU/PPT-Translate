@@ -6,3 +6,4 @@ uploads/
 npm-debug.log*
 coverage/
 ppt-translate-*.png
+test-results/
