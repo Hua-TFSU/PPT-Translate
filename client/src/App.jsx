@@ -442,6 +442,9 @@ function App() {
                     <span>{item.location}</span>
                     <small>{item.ocrProvider || "未识别"}</small>
                   </div>
+                  {item.originalImageUrl && (
+                    <img className="ocrPreview" src={item.originalImageUrl} alt={item.location} />
+                  )}
                   <p>{item.ocrText || "无 OCR 文本"}</p>
                   {item.translatedOcrText && <p className="translatedOcr">{item.translatedOcrText}</p>}
                   <div className="imageActions">

@@ -8,6 +8,7 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - Language direction selection: Chinese to English, English to Chinese, or custom source/target pairs.
 - PPTX text extraction from slide XML.
 - PPTX image asset extraction with optional local OCR through `tesseract.js`.
+- PPTX image previews in the OCR panel through `/api/jobs/:jobId/images/:imageId/original`.
 - PDF text-layer extraction through `pdfjs-dist`.
 - Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
 - Translation provider chain: OpenAI, DeepL, then a safe unconfigured fallback.

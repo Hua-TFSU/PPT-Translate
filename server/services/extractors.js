@@ -24,11 +24,18 @@ const imageMimeTypes = new Map([
   [".webp", "image/webp"]
 ]);
 
-export async function extractDocument({ filepath, filename, mimetype, ocrMode = "auto" }) {
+export async function extractDocument({
+  filepath,
+  filename,
+  mimetype,
+  ocrMode = "auto",
+  jobId = "",
+  assetDir = ""
+}) {
   const extension = path.extname(filename).toLowerCase();
 
   if (extension === ".pptx") {
-    return extractPptx(filepath, ocrMode);
+    return extractPptx(filepath, ocrMode, { jobId, assetDir });
   }
 
   if (extension === ".pdf" || mimetype === "application/pdf") {
@@ -135,7 +142,7 @@ function markdownToSegments(markdown) {
   }));
 }
 
-async function extractPptx(filepath, ocrMode) {
+async function extractPptx(filepath, ocrMode, options = {}) {
   const buffer = await fs.readFile(filepath);
   const zip = await JSZip.loadAsync(buffer);
   const slideFiles = Object.keys(zip.files)
@@ -162,7 +169,14 @@ async function extractPptx(filepath, ocrMode) {
       });
     });
 
-    const slideImages = await extractSlideImages(zip, slidePath, slideNumberLabel, ocrMode, warnings);
+    const slideImages = await extractSlideImages(
+      zip,
+      slidePath,
+      slideNumberLabel,
+      ocrMode,
+      warnings,
+      options
+    );
     images.push(...slideImages);
     for (const image of slideImages) {
       if (image.ocrText?.trim()) {
@@ -240,7 +254,14 @@ function collectTextNodes(node) {
   return values;
 }
 
-async function extractSlideImages(zip, slidePath, slideNumberLabel, ocrMode, warnings) {
+async function extractSlideImages(
+  zip,
+  slidePath,
+  slideNumberLabel,
+  ocrMode,
+  warnings,
+  options = {}
+) {
   const relPath = slidePath.replace("ppt/slides/", "ppt/slides/_rels/") + ".rels";
   const relFile = zip.file(relPath);
   if (!relFile) return [];
@@ -267,9 +288,19 @@ async function extractSlideImages(zip, slidePath, slideNumberLabel, ocrMode, war
       filename: path.posix.basename(imagePath),
       mimeType,
       size: imageBuffer.length,
+      originalImageUrl: "",
+      assetFilename: "",
       ocrText: "",
       ocrProvider: ""
     };
+
+    if (options.assetDir && options.jobId) {
+      await fs.mkdir(options.assetDir, { recursive: true });
+      const assetFilename = `${image.id}${extension || ".img"}`;
+      await fs.writeFile(path.join(options.assetDir, assetFilename), imageBuffer);
+      image.assetFilename = assetFilename;
+      image.originalImageUrl = `/api/jobs/${options.jobId}/images/${image.id}/original`;
+    }
 
     const shouldUseMathpix = (ocrMode === "mathpix" || ocrMode === "auto") && hasMathpixCredentials();
     const shouldUseLocal =

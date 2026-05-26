@@ -226,6 +226,25 @@ app.get("/api/jobs/:id/images/:imageId/redraw.svg", async (request, response) =>
   response.send(await fs.readFile(svgPath, "utf8"));
 });
 
+app.get("/api/jobs/:id/images/:imageId/original", async (request, response) => {
+  const job = getJob(request.params.id);
+  if (!job) {
+    response.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const image = job.result?.images?.find((item) => item.id === request.params.imageId);
+  if (!image?.assetFilename) {
+    response.status(404).json({ error: "Original image not found" });
+    return;
+  }
+
+  const imagePath = path.join(uploadDir, job.id, image.assetFilename);
+  response.setHeader("Content-Type", image.mimeType || "application/octet-stream");
+  response.setHeader("Cache-Control", "public, max-age=3600");
+  response.send(await fs.readFile(imagePath));
+});
+
 if (isProduction) {
   const clientDir = path.join(rootDir, "dist/client");
   app.use(express.static(clientDir));
@@ -254,7 +273,11 @@ async function processJob(jobId) {
       message: "正在抽取文本和 OCR"
     });
 
-    const extracted = await extractDocument(job);
+    const extracted = await extractDocument({
+      ...job,
+      jobId,
+      assetDir: path.join(uploadDir, jobId)
+    });
 
     updateJob(jobId, {
       progress: 62,

@@ -444,6 +444,17 @@ h1 {
   line-height: 1.55;
 }
 
+.ocrPreview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  margin: 8px 0 12px;
+  border: 1px solid #edf1ee;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #f8fbf8;
+}
+
 .imageItem .translatedOcr {
   margin-top: 10px;
   color: #25342f;
