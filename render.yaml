@@ -32,6 +32,18 @@ services:
         sync: false
       - key: MATHPIX_APP_KEY
         sync: false
+      - key: AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
+        sync: false
+      - key: AZURE_DOCUMENT_INTELLIGENCE_KEY
+        sync: false
+      - key: AZURE_DOCUMENT_INTELLIGENCE_MODEL
+        value: prebuilt-read
+      - key: AWS_TEXTRACT_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_TEXTRACT_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_TEXTRACT_REGION
+        value: us-east-1
       - key: ENABLE_LOCAL_OCR
         value: "true"
       - key: TESSERACT_LANG

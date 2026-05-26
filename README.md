@@ -10,11 +10,11 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - PPTX image asset extraction with optional local OCR through `tesseract.js`.
 - PPTX image previews in the OCR panel through `/api/jobs/:jobId/images/:imageId/original`.
 - PDF text-layer extraction through `pdfjs-dist`.
-- Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
+- OCR provider integration path for Mathpix, Azure AI Document Intelligence, AWS Textract, and local Tesseract.
 - Login and registration screen for the web workspace, with browser-side persistence of each user's runtime keys and glossary.
 - Translation provider chain: OpenAI, DeepSeek, Doubao, DeepL, then a safe unconfigured fallback.
 - Formula guard for math-heavy PDFs: formula-like snippets are replaced with placeholders before translation and restored exactly afterward, with a consistency summary in exports.
-- Runtime key API for OpenAI, DeepSeek, Doubao, and Mathpix credentials.
+- Runtime key API for OpenAI, DeepSeek, Doubao, Mathpix, Azure AI, and AWS Textract credentials.
 - Glossary API and UI. Saved terms are sent to the model prompt and enforced during translation.
 - Export API: JSON, Markdown, DOCX, PDF.
 - Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
@@ -82,7 +82,13 @@ curl -X PUT http://localhost:4000/api/settings/model-keys \
     "doubaoApiKey": "volcengine-ark-key",
     "doubaoModel": "doubao-seed-1-6-251015",
     "mathpixAppId": "app_id",
-    "mathpixAppKey": "app_key"
+    "mathpixAppKey": "app_key",
+    "azureEndpoint": "https://<resource>.cognitiveservices.azure.com",
+    "azureApiKey": "...",
+    "azureModel": "prebuilt-read",
+    "awsAccessKeyId": "...",
+    "awsSecretAccessKey": "...",
+    "awsRegion": "us-east-1"
   }'
 ```
 
@@ -112,8 +118,19 @@ curl -X PUT http://localhost:4000/api/settings/glossary \
 | `PREFERRED_TRANSLATION_PROVIDER` | `auto`, `openai`, `deepseek`, or `doubao`. |
 | `DEEPL_API_KEY` | Enables DeepL translation if OpenAI is not configured. |
 | `MATHPIX_APP_ID` / `MATHPIX_APP_KEY` | Enables dedicated Mathpix OCR for scanned PDFs and formulas. |
+| `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` / `AZURE_DOCUMENT_INTELLIGENCE_KEY` | Enables Azure AI Document Intelligence OCR. |
+| `AZURE_DOCUMENT_INTELLIGENCE_MODEL` | Azure model, defaults to `prebuilt-read`. |
+| `AWS_TEXTRACT_ACCESS_KEY_ID` / `AWS_TEXTRACT_SECRET_ACCESS_KEY` | Enables AWS Textract OCR. |
+| `AWS_TEXTRACT_REGION` | AWS region, defaults to `us-east-1`. |
 | `ENABLE_LOCAL_OCR` | Enables slower local OCR for extracted PPT image assets. |
 | `TESSERACT_LANG` | OCR language pack, defaults to `eng+chi_sim`. |
+
+## OCR Provider Notes
+
+- Mathpix is the best fit when formula-to-LaTeX or math-heavy PDF restoration matters most.
+- Azure AI Document Intelligence Read is a strong general OCR option for PDFs, scans, and mixed document layouts.
+- AWS Textract is strong for document text extraction, tables, forms, and enterprise AWS deployments.
+- Baidu OCR and Alibaba Cloud OCR are good China-region alternatives. Baidu has mature high-accuracy OCR SKUs; Alibaba has document OCR and unified recognition APIs. They are not wired into this MVP yet because their signing and billing flows differ from the current provider set.
 
 ## Deploy To Render
 

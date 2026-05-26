@@ -4,6 +4,12 @@ import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 import { nanoid } from "nanoid";
 import {
+  hasAwsTextractCredentials,
+  hasAzureOcrCredentials,
+  recognizeDocumentWithAwsTextract,
+  recognizeDocumentWithAzure
+} from "./cloudOcr.js";
+import {
   convertPdfWithMathpix,
   hasMathpixCredentials,
   recognizeImageWithMathpix
@@ -65,6 +71,36 @@ async function extractPdf(filepath, filename, ocrMode) {
     warnings.push("Mathpix is selected but credentials are not configured.");
   }
 
+  if ((ocrMode === "azure" || ocrMode === "auto") && hasAzureOcrCredentials()) {
+    const text = await recognizeDocumentWithAzure(buffer, "application/pdf");
+    return {
+      type: "pdf",
+      extractor: "azure-document-intelligence",
+      segments: text ? textToSegments(text, "Azure OCR Block") : [],
+      images: [],
+      warnings
+    };
+  }
+
+  if (ocrMode === "azure") {
+    warnings.push("Azure AI Document Intelligence is selected but credentials are not configured.");
+  }
+
+  if ((ocrMode === "aws" || ocrMode === "auto") && hasAwsTextractCredentials()) {
+    const text = await recognizeDocumentWithAwsTextract(buffer);
+    return {
+      type: "pdf",
+      extractor: "aws-textract",
+      segments: text ? textToSegments(text, "AWS Textract Block") : [],
+      images: [],
+      warnings
+    };
+  }
+
+  if (ocrMode === "aws") {
+    warnings.push("AWS Textract is selected but credentials are not configured.");
+  }
+
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const document = await pdfjs.getDocument({
     data: new Uint8Array(buffer),
@@ -82,9 +118,9 @@ async function extractPdf(filepath, filename, ocrMode) {
     if (pageText.trim()) {
       splitTextBlocks(pageText).forEach((block, index, blocks) => {
         segments.push({
-        id: nanoid(8),
+          id: nanoid(8),
           location: blocks.length > 1 ? `Page ${pageNumber}.${index + 1}` : `Page ${pageNumber}`,
-        kind: "text",
+          kind: "text",
           sourceText: block
         });
       });
@@ -306,15 +342,19 @@ function splitTextBlocks(text, maxChars = 1400) {
 }
 
 function markdownToSegments(markdown) {
-  const blocks = markdown
+  return textToSegments(markdown, "Markdown Block", "markdown");
+}
+
+function textToSegments(text, locationPrefix, kind = "text") {
+  const blocks = text
     .split(/\n{2,}/)
     .map((block) => block.trim())
     .filter(Boolean);
 
   return blocks.map((block, index) => ({
     id: nanoid(8),
-    location: `Markdown Block ${index + 1}`,
-    kind: "markdown",
+    location: `${locationPrefix} ${index + 1}`,
+    kind,
     sourceText: block
   }));
 }
@@ -480,18 +520,30 @@ async function extractSlideImages(
     }
 
     const shouldUseMathpix = (ocrMode === "mathpix" || ocrMode === "auto") && hasMathpixCredentials();
+    const shouldUseAzure = (ocrMode === "azure" || ocrMode === "auto") && hasAzureOcrCredentials();
+    const shouldUseAws = (ocrMode === "aws" || ocrMode === "auto") && hasAwsTextractCredentials();
     const shouldUseLocal =
       ocrMode === "local" ||
-      (ocrMode === "auto" && process.env.ENABLE_LOCAL_OCR !== "false");
+      (ocrMode === "auto" &&
+        process.env.ENABLE_LOCAL_OCR !== "false" &&
+        !shouldUseMathpix &&
+        !shouldUseAzure &&
+        !shouldUseAws);
 
     try {
       if (shouldUseMathpix) {
         image.ocrText = await recognizeImageWithMathpix(imageBuffer, mimeType);
         image.ocrProvider = "mathpix";
+      } else if (shouldUseAzure) {
+        image.ocrText = await recognizeDocumentWithAzure(imageBuffer, mimeType);
+        image.ocrProvider = "azure-document-intelligence";
+      } else if (shouldUseAws) {
+        image.ocrText = await recognizeDocumentWithAwsTextract(imageBuffer);
+        image.ocrProvider = "aws-textract";
       } else if (shouldUseLocal) {
         image.ocrText = await recognizeImageWithTesseract(imageBuffer);
         image.ocrProvider = "tesseract.js";
-      } else if (ocrMode === "mathpix") {
+      } else if (["mathpix", "azure", "aws"].includes(ocrMode)) {
         image.ocrProvider = "not configured";
       } else {
         image.ocrProvider = "skipped";

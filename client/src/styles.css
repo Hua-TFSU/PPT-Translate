@@ -339,7 +339,21 @@ h1 {
   gap: 6px;
 }
 
-.providerSelect button {
+.apiProviderGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.subSectionTitle {
+  margin-top: 4px;
+  color: #66736f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.providerSelect button,
+.apiProviderGrid button {
   min-height: 34px;
   border: 1px solid #d8e2dd;
   border-radius: 8px;
@@ -350,7 +364,8 @@ h1 {
   font-weight: 800;
 }
 
-.providerSelect button.active {
+.providerSelect button.active,
+.apiProviderGrid button.active {
   border-color: #287c71;
   background: #e5f4f1;
   color: #164d47;
@@ -702,6 +717,7 @@ h1 {
   }
 
   .providerSelect,
+  .apiProviderGrid,
   .keyLinks {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

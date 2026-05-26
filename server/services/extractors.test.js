@@ -164,7 +164,13 @@ describe("document pipeline", () => {
       doubaoApiKey: "volcengine-doubao-test-key",
       doubaoModel: "doubao-seed-1-6-251015",
       mathpixAppId: "test-mathpix-id",
-      mathpixAppKey: "test-mathpix-secret"
+      mathpixAppKey: "test-mathpix-secret",
+      azureEndpoint: "https://example.cognitiveservices.azure.com",
+      azureApiKey: "azure-document-key",
+      azureModel: "prebuilt-read",
+      awsAccessKeyId: "AKIATESTKEY",
+      awsSecretAccessKey: "aws-secret-test-key",
+      awsRegion: "us-west-2"
     });
 
     expect(status.preferredProvider).toBe("deepseek");
@@ -174,11 +180,23 @@ describe("document pipeline", () => {
     expect(status.doubao.keyPreview).toBe("vol...-key");
     expect(status.mathpix.configured).toBe(true);
     expect(status.mathpix.appIdPreview).toBe("tes...x-id");
+    expect(status.azureOcr.configured).toBe(true);
+    expect(status.azureOcr.keyPreview).toBe("azu...-key");
+    expect(status.awsTextract.configured).toBe(true);
+    expect(status.awsTextract.secretKeyPreview).toBe("aws...-key");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("deepseek-test");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("doubao-test");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("mathpix-secret");
+    expect(JSON.stringify(getModelKeyStatus())).not.toContain("aws-secret-test");
 
-    updateModelKeys({ clearDeepSeek: true, clearDoubao: true, clearMathpix: true, preferredProvider: "auto" });
+    updateModelKeys({
+      clearDeepSeek: true,
+      clearDoubao: true,
+      clearMathpix: true,
+      clearAzure: true,
+      clearAws: true,
+      preferredProvider: "auto"
+    });
   });
 
   it("stores glossary terms for translation prompts", () => {

@@ -30,6 +30,8 @@ const languageLabels = {
 const ocrModes = [
   { label: "自动", value: "auto" },
   { label: "Mathpix", value: "mathpix" },
+  { label: "Azure AI", value: "azure" },
+  { label: "AWS Textract", value: "aws" },
   { label: "本地 OCR", value: "local" },
   { label: "仅文本", value: "text" }
 ];
@@ -43,12 +45,26 @@ const emptyKeyForm = {
   doubaoApiKey: "",
   doubaoModel: "doubao-seed-1-6-251015",
   mathpixAppId: "",
-  mathpixAppKey: ""
+  mathpixAppKey: "",
+  azureEndpoint: "",
+  azureApiKey: "",
+  azureModel: "prebuilt-read",
+  awsAccessKeyId: "",
+  awsSecretAccessKey: "",
+  awsRegion: "us-east-1"
 };
 
 const emptyTerm = { source: "", target: "", note: "" };
 const accountsKey = "pptTranslate:accounts";
-const providerOptions = ["auto", "openai", "deepseek", "doubao"];
+const translationProviderOptions = ["auto", "openai", "deepseek", "doubao"];
+const keyProviderOptions = [
+  { value: "openai", label: "OpenAI" },
+  { value: "deepseek", label: "DeepSeek" },
+  { value: "doubao", label: "字节豆包" },
+  { value: "mathpix", label: "Mathpix" },
+  { value: "azure", label: "Azure AI" },
+  { value: "aws", label: "AWS Textract" }
+];
 
 function statusLabel(status) {
   return {
@@ -87,6 +103,7 @@ function App() {
   const [appInfo, setAppInfo] = useState(null);
   const [keyStatus, setKeyStatus] = useState(null);
   const [keyForm, setKeyForm] = useState(emptyKeyForm);
+  const [activeKeyProvider, setActiveKeyProvider] = useState("openai");
   const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [glossaryTerms, setGlossaryTerms] = useState([emptyTerm]);
   const [isSavingGlossary, setIsSavingGlossary] = useState(false);
@@ -143,7 +160,10 @@ function App() {
         preferredProvider: payload.preferredProvider || "auto",
         openaiModel: payload.openai?.model || current.openaiModel,
         deepseekModel: payload.deepseek?.model || current.deepseekModel,
-        doubaoModel: payload.doubao?.model || current.doubaoModel
+        doubaoModel: payload.doubao?.model || current.doubaoModel,
+        azureEndpoint: payload.azureOcr?.endpoint || current.azureEndpoint,
+        azureModel: payload.azureOcr?.model || current.azureModel,
+        awsRegion: payload.awsTextract?.region || current.awsRegion
       }));
     }
   }
@@ -159,7 +179,9 @@ function App() {
         openaiApiKey: "",
         deepseekApiKey: "",
         doubaoApiKey: "",
-        mathpixAppKey: ""
+        mathpixAppKey: "",
+        azureApiKey: "",
+        awsSecretAccessKey: ""
       }));
       await fetch("/api/settings/model-keys", {
         method: "PUT",
@@ -302,7 +324,13 @@ function App() {
       ...(keyForm.deepseekApiKey.trim() ? { deepseekApiKey: keyForm.deepseekApiKey.trim() } : {}),
       ...(keyForm.doubaoApiKey.trim() ? { doubaoApiKey: keyForm.doubaoApiKey.trim() } : {}),
       ...(keyForm.mathpixAppId.trim() ? { mathpixAppId: keyForm.mathpixAppId.trim() } : {}),
-      ...(keyForm.mathpixAppKey.trim() ? { mathpixAppKey: keyForm.mathpixAppKey.trim() } : {})
+      ...(keyForm.mathpixAppKey.trim() ? { mathpixAppKey: keyForm.mathpixAppKey.trim() } : {}),
+      ...(keyForm.azureEndpoint.trim() ? { azureEndpoint: keyForm.azureEndpoint.trim() } : {}),
+      ...(keyForm.azureApiKey.trim() ? { azureApiKey: keyForm.azureApiKey.trim() } : {}),
+      ...(keyForm.azureModel.trim() ? { azureModel: keyForm.azureModel.trim() } : {}),
+      ...(keyForm.awsAccessKeyId.trim() ? { awsAccessKeyId: keyForm.awsAccessKeyId.trim() } : {}),
+      ...(keyForm.awsSecretAccessKey.trim() ? { awsSecretAccessKey: keyForm.awsSecretAccessKey.trim() } : {}),
+      ...(keyForm.awsRegion.trim() ? { awsRegion: keyForm.awsRegion.trim() } : {})
     };
 
     try {
@@ -320,7 +348,9 @@ function App() {
         openaiApiKey: "",
         deepseekApiKey: "",
         doubaoApiKey: "",
-        mathpixAppKey: ""
+        mathpixAppKey: "",
+        azureApiKey: "",
+        awsSecretAccessKey: ""
       }));
     } catch (keyError) {
       setError(keyError.message);
@@ -393,6 +423,177 @@ function App() {
       const next = current.filter((_, termIndex) => termIndex !== index);
       return next.length ? next : [emptyTerm];
     });
+  }
+
+  function renderKeyFields() {
+    if (activeKeyProvider === "openai") {
+      return (
+        <>
+          <label className="keyField">
+            OpenAI API Key
+            <input
+              type="password"
+              placeholder={keyStatus?.openai?.configured ? keyStatus.openai.keyPreview : "sk-..."}
+              value={keyForm.openaiApiKey}
+              onChange={(event) => setKeyForm((current) => ({ ...current, openaiApiKey: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            OpenAI 模型
+            <input
+              value={keyForm.openaiModel}
+              onChange={(event) => setKeyForm((current) => ({ ...current, openaiModel: event.target.value }))}
+            />
+          </label>
+        </>
+      );
+    }
+
+    if (activeKeyProvider === "deepseek") {
+      return (
+        <>
+          <label className="keyField">
+            DeepSeek API Key
+            <input
+              type="password"
+              placeholder={keyStatus?.deepseek?.configured ? keyStatus.deepseek.keyPreview : "sk-..."}
+              value={keyForm.deepseekApiKey}
+              onChange={(event) => setKeyForm((current) => ({ ...current, deepseekApiKey: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            DeepSeek 模型
+            <input
+              value={keyForm.deepseekModel}
+              onChange={(event) => setKeyForm((current) => ({ ...current, deepseekModel: event.target.value }))}
+            />
+          </label>
+        </>
+      );
+    }
+
+    if (activeKeyProvider === "doubao") {
+      return (
+        <>
+          <label className="keyField">
+            字节豆包 API Key
+            <input
+              type="password"
+              placeholder={keyStatus?.doubao?.configured ? keyStatus.doubao.keyPreview : "Volcengine Ark API Key"}
+              value={keyForm.doubaoApiKey}
+              onChange={(event) => setKeyForm((current) => ({ ...current, doubaoApiKey: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            方舟模型或接入点 ID
+            <input
+              value={keyForm.doubaoModel}
+              onChange={(event) => setKeyForm((current) => ({ ...current, doubaoModel: event.target.value }))}
+            />
+          </label>
+          <a className="secondaryLink" href="https://console.volcengine.com/ark" target="_blank" rel="noreferrer">
+            <ExternalLink size={15} />
+            打开火山方舟控制台
+          </a>
+        </>
+      );
+    }
+
+    if (activeKeyProvider === "mathpix") {
+      return (
+        <>
+          <label className="keyField">
+            Mathpix App ID
+            <input
+              placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appIdPreview : "app_id"}
+              value={keyForm.mathpixAppId}
+              onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppId: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            Mathpix App Key
+            <input
+              type="password"
+              placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appKeyPreview : "app_key"}
+              value={keyForm.mathpixAppKey}
+              onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppKey: event.target.value }))}
+            />
+          </label>
+          <a className="secondaryLink" href="https://console.mathpix.com/ocr-api" target="_blank" rel="noreferrer">
+            <ExternalLink size={15} />
+            打开 Mathpix OCR API
+          </a>
+        </>
+      );
+    }
+
+    if (activeKeyProvider === "azure") {
+      return (
+        <>
+          <label className="keyField">
+            Azure Document Intelligence Endpoint
+            <input
+              placeholder="https://<resource>.cognitiveservices.azure.com"
+              value={keyForm.azureEndpoint}
+              onChange={(event) => setKeyForm((current) => ({ ...current, azureEndpoint: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            Azure API Key
+            <input
+              type="password"
+              placeholder={keyStatus?.azureOcr?.configured ? keyStatus.azureOcr.keyPreview : "Azure key"}
+              value={keyForm.azureApiKey}
+              onChange={(event) => setKeyForm((current) => ({ ...current, azureApiKey: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            Azure 模型
+            <input
+              value={keyForm.azureModel}
+              onChange={(event) => setKeyForm((current) => ({ ...current, azureModel: event.target.value }))}
+            />
+          </label>
+          <a className="secondaryLink" href="https://portal.azure.com/" target="_blank" rel="noreferrer">
+            <ExternalLink size={15} />
+            打开 Azure 门户
+          </a>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <label className="keyField">
+          AWS Access Key ID
+          <input
+            placeholder={keyStatus?.awsTextract?.configured ? keyStatus.awsTextract.accessKeyPreview : "AKIA..."}
+            value={keyForm.awsAccessKeyId}
+            onChange={(event) => setKeyForm((current) => ({ ...current, awsAccessKeyId: event.target.value }))}
+          />
+        </label>
+        <label className="keyField">
+          AWS Secret Access Key
+          <input
+            type="password"
+            placeholder={keyStatus?.awsTextract?.configured ? keyStatus.awsTextract.secretKeyPreview : "secret"}
+            value={keyForm.awsSecretAccessKey}
+            onChange={(event) => setKeyForm((current) => ({ ...current, awsSecretAccessKey: event.target.value }))}
+          />
+        </label>
+        <label className="keyField">
+          AWS Region
+          <input
+            value={keyForm.awsRegion}
+            onChange={(event) => setKeyForm((current) => ({ ...current, awsRegion: event.target.value }))}
+          />
+        </label>
+        <a className="secondaryLink" href="https://console.aws.amazon.com/textract/" target="_blank" rel="noreferrer">
+          <ExternalLink size={15} />
+          打开 AWS Textract
+        </a>
+      </>
+    );
   }
 
   if (!currentUser) {
@@ -558,10 +759,11 @@ function App() {
             <form className="keyPanel" onSubmit={saveKeys}>
               <div className="sectionTitle">
                 <KeyRound size={16} />
-                模型 Key
+                API Key
               </div>
+              <div className="subSectionTitle">翻译优先</div>
               <div className="providerSelect">
-                {providerOptions.map((provider) => (
+                {translationProviderOptions.map((provider) => (
                   <button
                     key={provider}
                     type="button"
@@ -572,85 +774,20 @@ function App() {
                   </button>
                 ))}
               </div>
-              <label className="keyField">
-                OpenAI
-                <input
-                  type="password"
-                  placeholder={keyStatus?.openai?.configured ? keyStatus.openai.keyPreview : "sk-..."}
-                  value={keyForm.openaiApiKey}
-                  onChange={(event) => setKeyForm((current) => ({ ...current, openaiApiKey: event.target.value }))}
-                />
-              </label>
-              <input
-                className="modelInput"
-                value={keyForm.openaiModel}
-                onChange={(event) => setKeyForm((current) => ({ ...current, openaiModel: event.target.value }))}
-              />
-              <label className="keyField">
-                DeepSeek
-                <input
-                  type="password"
-                  placeholder={keyStatus?.deepseek?.configured ? keyStatus.deepseek.keyPreview : "sk-..."}
-                  value={keyForm.deepseekApiKey}
-                  onChange={(event) => setKeyForm((current) => ({ ...current, deepseekApiKey: event.target.value }))}
-                />
-              </label>
-              <input
-                className="modelInput"
-                value={keyForm.deepseekModel}
-                onChange={(event) => setKeyForm((current) => ({ ...current, deepseekModel: event.target.value }))}
-              />
-              <label className="keyField">
-                字节豆包
-                <input
-                  type="password"
-                  placeholder={keyStatus?.doubao?.configured ? keyStatus.doubao.keyPreview : "Volcengine Ark API Key"}
-                  value={keyForm.doubaoApiKey}
-                  onChange={(event) => setKeyForm((current) => ({ ...current, doubaoApiKey: event.target.value }))}
-                />
-              </label>
-              <input
-                className="modelInput"
-                value={keyForm.doubaoModel}
-                onChange={(event) => setKeyForm((current) => ({ ...current, doubaoModel: event.target.value }))}
-              />
-              <label className="keyField">
-                Mathpix App ID
-                <input
-                  placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appIdPreview : "app_id"}
-                  value={keyForm.mathpixAppId}
-                  onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppId: event.target.value }))}
-                />
-              </label>
-              <label className="keyField">
-                Mathpix App Key
-                <input
-                  type="password"
-                  placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appKeyPreview : "app_key"}
-                  value={keyForm.mathpixAppKey}
-                  onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppKey: event.target.value }))}
-                />
-              </label>
-              <div className="keyLinks">
-                <a
-                  className="secondaryLink"
-                  href="https://console.volcengine.com/ark"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <ExternalLink size={15} />
-                  豆包 Key
-                </a>
-                <a
-                  className="secondaryLink"
-                  href="https://console.mathpix.com/ocr-api"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <ExternalLink size={15} />
-                  Mathpix Key
-                </a>
+              <div className="subSectionTitle">API 提供商</div>
+              <div className="apiProviderGrid">
+                {keyProviderOptions.map((provider) => (
+                  <button
+                    key={provider.value}
+                    type="button"
+                    className={activeKeyProvider === provider.value ? "active" : ""}
+                    onClick={() => setActiveKeyProvider(provider.value)}
+                  >
+                    {provider.label}
+                  </button>
+                ))}
               </div>
+              {renderKeyFields()}
               <button className="secondaryAction" type="submit" disabled={isSavingKeys}>
                 {isSavingKeys ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
                 保存 Key
