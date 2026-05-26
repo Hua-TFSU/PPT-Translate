@@ -5,10 +5,15 @@ import cors from "cors";
 import express from "express";
 import multer from "multer";
 import { createJob, getJob, listJobs, toPublicJob, updateJob } from "./lib/jobs.js";
-import { buildDocx, buildMarkdown } from "./services/exporters.js";
+import { buildDocx, buildMarkdown, buildPdf } from "./services/exporters.js";
 import { extractDocument } from "./services/extractors.js";
 import { createRedrawnFigure } from "./services/redraw.js";
-import { getModelKeyStatus, updateModelKeys } from "./services/runtimeConfig.js";
+import {
+  getGlossary,
+  getModelKeyStatus,
+  updateGlossary,
+  updateModelKeys
+} from "./services/runtimeConfig.js";
 import { translateSegments } from "./services/translator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -73,6 +78,14 @@ app.get("/api/settings/model-keys", (_request, response) => {
 
 app.put("/api/settings/model-keys", (request, response) => {
   response.json(updateModelKeys(request.body || {}));
+});
+
+app.get("/api/settings/glossary", (_request, response) => {
+  response.json(getGlossary());
+});
+
+app.put("/api/settings/glossary", (request, response) => {
+  response.json(updateGlossary(request.body || {}));
 });
 
 app.get("/api/jobs", (_request, response) => {
@@ -147,6 +160,14 @@ app.get("/api/jobs/:id/export", async (request, response) => {
     );
     response.setHeader("Content-Disposition", `attachment; filename="${baseName}.translated.docx"`);
     response.send(docx);
+    return;
+  }
+
+  if (format === "pdf") {
+    const pdf = await buildPdf(job);
+    response.setHeader("Content-Type", "application/pdf");
+    response.setHeader("Content-Disposition", `attachment; filename="${baseName}.translated.pdf"`);
+    response.send(pdf);
     return;
   }
 

@@ -1,6 +1,6 @@
 # PPT-Translate
 
-PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentation or PDF uploads, extracts slide/page text, runs OCR on image-heavy content when configured, translates between Chinese and English, and exports translated results through JSON, Markdown, or DOCX endpoints.
+PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentation or PDF uploads, extracts slide/page text, runs OCR on image-heavy content when configured, translates between Chinese and English, and exports translated results through JSON, Markdown, DOCX, or PDF endpoints.
 
 ## Features
 
@@ -11,10 +11,12 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - PPTX image previews in the OCR panel through `/api/jobs/:jobId/images/:imageId/original`.
 - PDF text-layer extraction through `pdfjs-dist`.
 - Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
-- Translation provider chain: OpenAI, DeepL, then a safe unconfigured fallback.
+- Login screen for the web workspace and browser-side persistence of each user's runtime keys and glossary.
+- Translation provider chain: OpenAI, DeepSeek, DeepL, then a safe unconfigured fallback.
 - Formula guard for math-heavy PDFs: formula-like snippets are replaced with placeholders before translation and restored exactly afterward, with a consistency summary in exports.
-- Runtime key API for OpenAI and DeepSeek translation providers.
-- Export API: JSON, Markdown, DOCX.
+- Runtime key API for OpenAI, DeepSeek, and Mathpix credentials.
+- Glossary API and UI. Saved terms are sent to the model prompt and enforced during translation.
+- Export API: JSON, Markdown, DOCX, PDF.
 - Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
 - Render deployment blueprint through `render.yaml`.
 
@@ -54,6 +56,7 @@ curl http://localhost:4000/api/jobs/<jobId>
 curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=markdown" -o translated.md
 curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=json" -o translated.json
 curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=docx" -o translated.docx
+curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=pdf" -o translated.pdf
 ```
 
 ### Redraw OCR Images
@@ -75,7 +78,21 @@ curl -X PUT http://localhost:4000/api/settings/model-keys \
     "openaiApiKey": "sk-...",
     "openaiModel": "gpt-4.1-mini",
     "deepseekApiKey": "sk-...",
-    "deepseekModel": "deepseek-v4-flash"
+    "deepseekModel": "deepseek-v4-flash",
+    "mathpixAppId": "app_id",
+    "mathpixAppKey": "app_key"
+  }'
+```
+
+### Update Glossary
+
+```bash
+curl -X PUT http://localhost:4000/api/settings/glossary \
+  -H "Content-Type: application/json" \
+  -d '{
+    "terms": [
+      { "source": "smart grid", "target": "智能电网", "note": "energy domain" }
+    ]
   }'
 ```
 
@@ -99,7 +116,7 @@ curl -X PUT http://localhost:4000/api/settings/model-keys \
 
 1. Push this repository to GitHub.
 2. In Render, create a Blueprint from the repository.
-3. Add the secret environment variables for OpenAI/DeepL/Mathpix.
+3. Add the secret environment variables for OpenAI/DeepSeek/DeepL/Mathpix when you want server-level defaults.
 4. Deploy.
 
 The included `render.yaml` already defines the Node web service build and start commands.

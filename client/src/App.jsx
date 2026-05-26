@@ -2,12 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   Download,
+  ExternalLink,
   FileText,
+  KeyRound,
   Languages,
   Loader2,
+  LogOut,
+  Plus,
   RefreshCcw,
+  Trash2,
   UploadCloud
 } from "lucide-react";
 
@@ -28,6 +34,18 @@ const ocrModes = [
   { label: "仅文本", value: "text" }
 ];
 
+const emptyKeyForm = {
+  preferredProvider: "auto",
+  openaiApiKey: "",
+  openaiModel: "gpt-4.1-mini",
+  deepseekApiKey: "",
+  deepseekModel: "deepseek-v4-flash",
+  mathpixAppId: "",
+  mathpixAppKey: ""
+};
+
+const emptyTerm = { source: "", target: "", note: "" };
+
 function statusLabel(status) {
   return {
     queued: "排队中",
@@ -37,7 +55,22 @@ function statusLabel(status) {
   }[status] || status;
 }
 
+function storageKey(user, name) {
+  return `pptTranslate:${user}:${name}`;
+}
+
+function loadJson(key, fallback) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function App() {
+  const [currentUser, setCurrentUser] = useState(() => window.localStorage.getItem("pptTranslate:user") || "");
+  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [file, setFile] = useState(null);
   const [direction, setDirection] = useState(directions[0]);
   const [ocrMode, setOcrMode] = useState("auto");
@@ -48,14 +81,10 @@ function App() {
   const [jobs, setJobs] = useState([]);
   const [appInfo, setAppInfo] = useState(null);
   const [keyStatus, setKeyStatus] = useState(null);
-  const [keyForm, setKeyForm] = useState({
-    preferredProvider: "auto",
-    openaiApiKey: "",
-    openaiModel: "gpt-4.1-mini",
-    deepseekApiKey: "",
-    deepseekModel: "deepseek-v4-flash"
-  });
+  const [keyForm, setKeyForm] = useState(emptyKeyForm);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
+  const [glossaryTerms, setGlossaryTerms] = useState([emptyTerm]);
+  const [isSavingGlossary, setIsSavingGlossary] = useState(false);
   const fileInputRef = useRef(null);
 
   const canExport = job?.status === "completed";
@@ -65,23 +94,38 @@ function App() {
   const warnings = job?.result?.warnings || [];
   const isUntranslated = warnings.some((warning) => warning.includes("not a translated result"));
 
+  useEffect(() => {
+    if (!currentUser) return;
+    refreshHealth().catch(() => undefined);
+    refreshJobs().catch(() => undefined);
+    refreshKeyStatus().catch(() => undefined);
+    hydrateUserSettings(currentUser).catch(() => undefined);
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!job?.id || ["completed", "failed"].includes(job.status)) return undefined;
+    const timer = window.setInterval(async () => {
+      const response = await fetch(`/api/jobs/${job.id}`);
+      if (response.ok) {
+        const payload = await response.json();
+        setJob(payload.job);
+        refreshJobs().catch(() => undefined);
+      }
+    }, 1200);
+    return () => window.clearInterval(timer);
+  }, [job?.id, job?.status]);
+
+  async function refreshHealth() {
+    const response = await fetch("/api/health");
+    if (response.ok) setAppInfo(await response.json());
+  }
+
   async function refreshJobs() {
     const response = await fetch("/api/jobs");
     if (response.ok) {
       const payload = await response.json();
       setJobs(payload.jobs || []);
     }
-  }
-
-  useEffect(() => {
-    refreshJobs().catch(() => undefined);
-    refreshKeyStatus().catch(() => undefined);
-    refreshHealth().catch(() => undefined);
-  }, []);
-
-  async function refreshHealth() {
-    const response = await fetch("/api/health");
-    if (response.ok) setAppInfo(await response.json());
   }
 
   async function refreshKeyStatus() {
@@ -98,18 +142,50 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    if (!job?.id || ["completed", "failed"].includes(job.status)) return undefined;
-    const timer = window.setInterval(async () => {
-      const response = await fetch(`/api/jobs/${job.id}`);
-      if (response.ok) {
-        const payload = await response.json();
-        setJob(payload.job);
-        refreshJobs().catch(() => undefined);
-      }
-    }, 1200);
-    return () => window.clearInterval(timer);
-  }, [job?.id, job?.status]);
+  async function hydrateUserSettings(user) {
+    const savedKeys = loadJson(storageKey(user, "keys"), null);
+    const savedGlossary = loadJson(storageKey(user, "glossary"), null);
+
+    if (savedKeys) {
+      setKeyForm((current) => ({ ...current, ...savedKeys, openaiApiKey: "", deepseekApiKey: "", mathpixAppKey: "" }));
+      await fetch("/api/settings/model-keys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(savedKeys)
+      });
+      await refreshKeyStatus();
+    }
+
+    if (savedGlossary?.terms?.length) {
+      setGlossaryTerms(savedGlossary.terms);
+      await fetch("/api/settings/glossary", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(savedGlossary)
+      });
+    }
+  }
+
+  function login(event) {
+    event.preventDefault();
+    const username = loginForm.username.trim();
+    if (!username) {
+      setError("请输入用户名");
+      return;
+    }
+    window.localStorage.setItem("pptTranslate:user", username);
+    setCurrentUser(username);
+    setError("");
+  }
+
+  function logout() {
+    window.localStorage.removeItem("pptTranslate:user");
+    setCurrentUser("");
+    setJob(null);
+    setJobs([]);
+    setFile(null);
+    setError("");
+  }
 
   async function upload() {
     if (!file) {
@@ -154,24 +230,68 @@ function App() {
     setIsSavingKeys(true);
     setError("");
 
+    const previous = loadJson(storageKey(currentUser, "keys"), emptyKeyForm);
+    const nextKeys = {
+      ...previous,
+      preferredProvider: keyForm.preferredProvider,
+      openaiModel: keyForm.openaiModel,
+      deepseekModel: keyForm.deepseekModel,
+      ...(keyForm.openaiApiKey.trim() ? { openaiApiKey: keyForm.openaiApiKey.trim() } : {}),
+      ...(keyForm.deepseekApiKey.trim() ? { deepseekApiKey: keyForm.deepseekApiKey.trim() } : {}),
+      ...(keyForm.mathpixAppId.trim() ? { mathpixAppId: keyForm.mathpixAppId.trim() } : {}),
+      ...(keyForm.mathpixAppKey.trim() ? { mathpixAppKey: keyForm.mathpixAppKey.trim() } : {})
+    };
+
     try {
       const response = await fetch("/api/settings/model-keys", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(keyForm)
+        body: JSON.stringify(nextKeys)
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "保存 Key 失败");
+      window.localStorage.setItem(storageKey(currentUser, "keys"), JSON.stringify(nextKeys));
       setKeyStatus(payload);
       setKeyForm((current) => ({
         ...current,
         openaiApiKey: "",
-        deepseekApiKey: ""
+        deepseekApiKey: "",
+        mathpixAppKey: ""
       }));
     } catch (keyError) {
       setError(keyError.message);
     } finally {
       setIsSavingKeys(false);
+    }
+  }
+
+  async function saveGlossary(event) {
+    event.preventDefault();
+    setIsSavingGlossary(true);
+    setError("");
+    const terms = glossaryTerms
+      .map((term) => ({
+        source: term.source.trim(),
+        target: term.target.trim(),
+        note: term.note.trim()
+      }))
+      .filter((term) => term.source && term.target);
+
+    try {
+      const response = await fetch("/api/settings/glossary", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ terms })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "保存术语库失败");
+      const next = payload.terms.length ? payload.terms : [emptyTerm];
+      setGlossaryTerms(next);
+      window.localStorage.setItem(storageKey(currentUser, "glossary"), JSON.stringify({ terms: next }));
+    } catch (glossaryError) {
+      setError(glossaryError.message);
+    } finally {
+      setIsSavingGlossary(false);
     }
   }
 
@@ -198,6 +318,59 @@ function App() {
     }
   }
 
+  function updateTerm(index, patch) {
+    setGlossaryTerms((current) =>
+      current.map((term, termIndex) => (termIndex === index ? { ...term, ...patch } : term))
+    );
+  }
+
+  function removeTerm(index) {
+    setGlossaryTerms((current) => {
+      const next = current.filter((_, termIndex) => termIndex !== index);
+      return next.length ? next : [emptyTerm];
+    });
+  }
+
+  if (!currentUser) {
+    return (
+      <main className="loginShell">
+        <section className="loginPanel">
+          <p className="eyebrow">PPT-Translate</p>
+          <h1>智能PPT翻译系统</h1>
+          <form onSubmit={login} className="loginForm">
+            <label>
+              用户名
+              <input
+                value={loginForm.username}
+                onChange={(event) => setLoginForm((current) => ({ ...current, username: event.target.value }))}
+                placeholder="请输入用户名"
+              />
+            </label>
+            <label>
+              密码
+              <input
+                type="password"
+                value={loginForm.password}
+                onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+                placeholder="本地演示登录"
+              />
+            </label>
+            <button className="primaryAction" type="submit">
+              <ArrowRight size={18} />
+              登录
+            </button>
+            {error && (
+              <p className="notice error">
+                <AlertCircle size={16} />
+                {error}
+              </p>
+            )}
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="shell">
       <section className="workspace">
@@ -207,9 +380,15 @@ function App() {
             <h1>PPT / PDF 翻译工作台</h1>
             {appInfo?.version && <p className="versionText">v{appInfo.version}</p>}
           </div>
-          <button className="iconButton" type="button" onClick={refreshJobs} aria-label="刷新任务">
-            <RefreshCcw size={18} />
-          </button>
+          <div className="topbarActions">
+            <span>{currentUser}</span>
+            <button className="iconButton" type="button" onClick={refreshJobs} aria-label="刷新任务">
+              <RefreshCcw size={18} />
+            </button>
+            <button className="iconButton" type="button" onClick={logout} aria-label="退出登录">
+              <LogOut size={18} />
+            </button>
+          </div>
         </div>
 
         <div className="layout">
@@ -278,16 +457,17 @@ function App() {
             </button>
 
             <form className="keyPanel" onSubmit={saveKeys}>
-              <div className="sectionTitle">模型 Key</div>
+              <div className="sectionTitle">
+                <KeyRound size={16} />
+                模型 Key
+              </div>
               <div className="providerSelect">
                 {["auto", "openai", "deepseek"].map((provider) => (
                   <button
                     key={provider}
                     type="button"
                     className={keyForm.preferredProvider === provider ? "active" : ""}
-                    onClick={() =>
-                      setKeyForm((current) => ({ ...current, preferredProvider: provider }))
-                    }
+                    onClick={() => setKeyForm((current) => ({ ...current, preferredProvider: provider }))}
                   >
                     {provider}
                   </button>
@@ -299,38 +479,49 @@ function App() {
                   type="password"
                   placeholder={keyStatus?.openai?.configured ? keyStatus.openai.keyPreview : "sk-..."}
                   value={keyForm.openaiApiKey}
-                  onChange={(event) =>
-                    setKeyForm((current) => ({ ...current, openaiApiKey: event.target.value }))
-                  }
+                  onChange={(event) => setKeyForm((current) => ({ ...current, openaiApiKey: event.target.value }))}
                 />
               </label>
               <input
                 className="modelInput"
                 value={keyForm.openaiModel}
-                onChange={(event) =>
-                  setKeyForm((current) => ({ ...current, openaiModel: event.target.value }))
-                }
+                onChange={(event) => setKeyForm((current) => ({ ...current, openaiModel: event.target.value }))}
               />
               <label className="keyField">
                 DeepSeek
                 <input
                   type="password"
-                  placeholder={
-                    keyStatus?.deepseek?.configured ? keyStatus.deepseek.keyPreview : "sk-..."
-                  }
+                  placeholder={keyStatus?.deepseek?.configured ? keyStatus.deepseek.keyPreview : "sk-..."}
                   value={keyForm.deepseekApiKey}
-                  onChange={(event) =>
-                    setKeyForm((current) => ({ ...current, deepseekApiKey: event.target.value }))
-                  }
+                  onChange={(event) => setKeyForm((current) => ({ ...current, deepseekApiKey: event.target.value }))}
                 />
               </label>
               <input
                 className="modelInput"
                 value={keyForm.deepseekModel}
-                onChange={(event) =>
-                  setKeyForm((current) => ({ ...current, deepseekModel: event.target.value }))
-                }
+                onChange={(event) => setKeyForm((current) => ({ ...current, deepseekModel: event.target.value }))}
               />
+              <label className="keyField">
+                Mathpix App ID
+                <input
+                  placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appIdPreview : "app_id"}
+                  value={keyForm.mathpixAppId}
+                  onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppId: event.target.value }))}
+                />
+              </label>
+              <label className="keyField">
+                Mathpix App Key
+                <input
+                  type="password"
+                  placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appKeyPreview : "app_key"}
+                  value={keyForm.mathpixAppKey}
+                  onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppKey: event.target.value }))}
+                />
+              </label>
+              <a className="secondaryLink" href="https://console.mathpix.com" target="_blank" rel="noreferrer">
+                <ExternalLink size={15} />
+                申请 Mathpix Key
+              </a>
               <button className="secondaryAction" type="submit" disabled={isSavingKeys}>
                 {isSavingKeys ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
                 保存 Key
@@ -370,9 +561,13 @@ function App() {
                 <div className="sectionTitle">译文</div>
                 <p className="muted">
                   {job ? `${statusLabel(job.status)} · ${job.filename}` : "等待上传"}
-                  {job ? ` · ${languageLabels[job.sourceLang] || job.sourceLang} -> ${languageLabels[job.targetLang] || job.targetLang}` : ""}
+                  {job
+                    ? ` · ${languageLabels[job.sourceLang] || job.sourceLang} -> ${languageLabels[job.targetLang] || job.targetLang}`
+                    : ""}
                   {formulaSummary
-                    ? ` · 公式${formulaSummary.ok ? "一致" : "有差异"} ${formulaSummary.totalFormulas - formulaSummary.missingFormulas}/${formulaSummary.totalFormulas}`
+                    ? ` · 公式${formulaSummary.ok ? "一致" : "有差异"} ${
+                        formulaSummary.totalFormulas - formulaSummary.missingFormulas
+                      }/${formulaSummary.totalFormulas}`
                     : ""}
                 </p>
                 {isUntranslated && <p className="warningText">未配置模型 Key，当前结果不是译文。</p>}
@@ -389,6 +584,10 @@ function App() {
                 <a className={!canExport ? "disabled" : ""} href={exportUrl("docx")}>
                   <Download size={16} />
                   DOCX
+                </a>
+                <a className={!canExport ? "disabled" : ""} href={exportUrl("pdf")}>
+                  <Download size={16} />
+                  PDF
                 </a>
               </div>
             </div>
@@ -432,6 +631,53 @@ function App() {
           </section>
         </div>
 
+        <section className="panel glossaryPanel">
+          <form onSubmit={saveGlossary}>
+            <div className="glossaryHeader">
+              <div className="sectionTitle">
+                <BookOpen size={16} />
+                术语库
+              </div>
+              <button
+                className="secondaryAction compact"
+                type="button"
+                onClick={() => setGlossaryTerms((current) => [...current, emptyTerm])}
+              >
+                <Plus size={15} />
+                添加术语
+              </button>
+            </div>
+            <div className="termGrid">
+              {glossaryTerms.map((term, index) => (
+                <div className="termRow" key={`${index}-${term.source}`}>
+                  <input
+                    placeholder="原文术语"
+                    value={term.source}
+                    onChange={(event) => updateTerm(index, { source: event.target.value })}
+                  />
+                  <input
+                    placeholder="指定译法"
+                    value={term.target}
+                    onChange={(event) => updateTerm(index, { target: event.target.value })}
+                  />
+                  <input
+                    placeholder="备注"
+                    value={term.note}
+                    onChange={(event) => updateTerm(index, { note: event.target.value })}
+                  />
+                  <button type="button" className="iconButton" onClick={() => removeTerm(index)} aria-label="删除术语">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button className="secondaryAction glossarySave" type="submit" disabled={isSavingGlossary}>
+              {isSavingGlossary ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
+              保存术语库
+            </button>
+          </form>
+        </section>
+
         {imageItems.length > 0 && (
           <section className="panel imagePanel">
             <div className="sectionTitle">图片 OCR</div>
@@ -448,12 +694,12 @@ function App() {
                   <p>{item.ocrText || "无 OCR 文本"}</p>
                   {item.translatedOcrText && <p className="translatedOcr">{item.translatedOcrText}</p>}
                   <div className="imageActions">
-                    <button
-                      type="button"
-                      onClick={() => redrawImage(item.id)}
-                      disabled={redrawingId === item.id}
-                    >
-                      {redrawingId === item.id ? <Loader2 className="spin" size={15} /> : <RefreshCcw size={15} />}
+                    <button type="button" onClick={() => redrawImage(item.id)} disabled={redrawingId === item.id}>
+                      {redrawingId === item.id ? (
+                        <Loader2 className="spin" size={15} />
+                      ) : (
+                        <RefreshCcw size={15} />
+                      )}
                       重新制图
                     </button>
                     {item.redrawnSvgPath && (

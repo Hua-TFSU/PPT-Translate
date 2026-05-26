@@ -12,7 +12,7 @@ const languageNames = {
 };
 
 const translationSystemPrompt =
-  "You are a professional academic and presentation translator. Translate all natural-language prose completely into the target language. If the target language is Chinese, use fluent Simplified Chinese. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve equations, citations, units, numbers, proper names, institution names, model names, and technical acronyms such as AI, PV, SOC, GA, MbA. Do not leave full English sentences or ordinary English clauses untranslated unless they are proper names, acronyms, formulas, references, or units. Repair PDF line breaks and hyphenation when translating. Return only valid JSON.";
+  "You are a professional academic and presentation translator. Translate all natural-language prose completely into the target language. If the target language is Chinese, use fluent Simplified Chinese. Apply the provided glossary exactly: when a source term appears, use its target term consistently. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve equations, citations, units, numbers, proper names, institution names, model names, and technical acronyms such as AI, PV, SOC, GA, MbA. Do not leave full English sentences or ordinary English clauses untranslated unless they are proper names, acronyms, formulas, references, or units. Repair PDF line breaks and hyphenation when translating. Return only valid JSON.";
 
 export async function translateSegments(segments, sourceLang, targetLang) {
   const cleanSegments = prepareSegmentsForTranslation(
@@ -22,19 +22,31 @@ export async function translateSegments(segments, sourceLang, targetLang) {
   const providerConfig = getProviderConfig();
 
   if (providerConfig.preferredProvider === "openai" && providerConfig.openai.apiKey) {
-    return translateWithOpenAI(cleanSegments, sourceLang, targetLang, providerConfig.openai);
+    return translateWithOpenAI(cleanSegments, sourceLang, targetLang, {
+      ...providerConfig.openai,
+      glossary: providerConfig.glossary
+    });
   }
 
   if (providerConfig.preferredProvider === "deepseek" && providerConfig.deepseek.apiKey) {
-    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, providerConfig.deepseek);
+    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, {
+      ...providerConfig.deepseek,
+      glossary: providerConfig.glossary
+    });
   }
 
   if (providerConfig.openai.apiKey) {
-    return translateWithOpenAI(cleanSegments, sourceLang, targetLang, providerConfig.openai);
+    return translateWithOpenAI(cleanSegments, sourceLang, targetLang, {
+      ...providerConfig.openai,
+      glossary: providerConfig.glossary
+    });
   }
 
   if (providerConfig.deepseek.apiKey) {
-    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, providerConfig.deepseek);
+    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, {
+      ...providerConfig.deepseek,
+      glossary: providerConfig.glossary
+    });
   }
 
   if (process.env.DEEPL_API_KEY) {
@@ -69,6 +81,7 @@ async function translateWithOpenAI(segments, sourceLang, targetLang, config) {
             content: JSON.stringify({
               sourceLanguage: languageNames[sourceLang] || sourceLang,
               targetLanguage: languageNames[targetLang] || targetLang,
+              glossary: config.glossary || [],
               items: batch.map(({ id, sourceText, location, kind }) => ({
                 id,
                 location,
@@ -152,6 +165,7 @@ async function translateWithDeepSeek(segments, sourceLang, targetLang, config) {
             content: JSON.stringify({
               sourceLanguage: languageNames[sourceLang] || sourceLang,
               targetLanguage: languageNames[targetLang] || targetLang,
+              glossary: config.glossary || [],
               outputSchema: {
                 translations: [{ id: "string", translatedText: "string" }]
               },

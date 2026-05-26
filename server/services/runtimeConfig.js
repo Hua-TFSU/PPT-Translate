@@ -7,7 +7,12 @@ const runtimeConfig = {
   deepseek: {
     apiKey: "",
     model: ""
-  }
+  },
+  mathpix: {
+    appId: "",
+    appKey: ""
+  },
+  glossary: []
 };
 
 export function updateModelKeys(input = {}) {
@@ -31,6 +36,14 @@ export function updateModelKeys(input = {}) {
     runtimeConfig.deepseek.model = input.deepseekModel.trim();
   }
 
+  if (typeof input.mathpixAppId === "string" && input.mathpixAppId.trim()) {
+    runtimeConfig.mathpix.appId = input.mathpixAppId.trim();
+  }
+
+  if (typeof input.mathpixAppKey === "string" && input.mathpixAppKey.trim()) {
+    runtimeConfig.mathpix.appKey = input.mathpixAppKey.trim();
+  }
+
   if (input.clearOpenAI === true) {
     runtimeConfig.openai.apiKey = "";
   }
@@ -39,7 +52,31 @@ export function updateModelKeys(input = {}) {
     runtimeConfig.deepseek.apiKey = "";
   }
 
+  if (input.clearMathpix === true) {
+    runtimeConfig.mathpix.appId = "";
+    runtimeConfig.mathpix.appKey = "";
+  }
+
   return getModelKeyStatus();
+}
+
+export function updateGlossary(input = {}) {
+  const terms = Array.isArray(input.terms) ? input.terms : [];
+  runtimeConfig.glossary = terms
+    .map((term) => ({
+      source: String(term.source || "").trim(),
+      target: String(term.target || "").trim(),
+      note: String(term.note || "").trim()
+    }))
+    .filter((term) => term.source && term.target)
+    .slice(0, 300);
+  return getGlossary();
+}
+
+export function getGlossary() {
+  return {
+    terms: runtimeConfig.glossary
+  };
 }
 
 export function getProviderConfig() {
@@ -56,7 +93,15 @@ export function getProviderConfig() {
         process.env.DEEPSEEK_MODEL ||
         "deepseek-v4-flash",
       apiUrl: process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/chat/completions"
-    }
+    },
+    glossary: runtimeConfig.glossary
+  };
+}
+
+export function getMathpixConfig() {
+  return {
+    appId: runtimeConfig.mathpix.appId || process.env.MATHPIX_APP_ID || "",
+    appKey: runtimeConfig.mathpix.appKey || process.env.MATHPIX_APP_KEY || ""
   };
 }
 
@@ -79,6 +124,17 @@ export function getModelKeyStatus() {
           : "none",
       keyPreview: maskKey(providerConfig.deepseek.apiKey),
       model: providerConfig.deepseek.model
+    },
+    mathpix: {
+      configured: Boolean(getMathpixConfig().appId && getMathpixConfig().appKey),
+      source:
+        runtimeConfig.mathpix.appId || runtimeConfig.mathpix.appKey
+          ? "runtime"
+          : process.env.MATHPIX_APP_ID || process.env.MATHPIX_APP_KEY
+            ? "env"
+            : "none",
+      appIdPreview: maskKey(getMathpixConfig().appId),
+      appKeyPreview: maskKey(getMathpixConfig().appKey)
     }
   };
 }

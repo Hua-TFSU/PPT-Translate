@@ -1,13 +1,17 @@
+import { getMathpixConfig } from "./runtimeConfig.js";
+
 const MATHPIX_BASE_URL = "https://api.mathpix.com/v3";
 
 export function hasMathpixCredentials() {
-  return Boolean(process.env.MATHPIX_APP_ID && process.env.MATHPIX_APP_KEY);
+  const config = getMathpixConfig();
+  return Boolean(config.appId && config.appKey);
 }
 
 function mathpixHeaders(extra = {}) {
+  const config = getMathpixConfig();
   return {
-    app_id: process.env.MATHPIX_APP_ID,
-    app_key: process.env.MATHPIX_APP_KEY,
+    app_id: config.appId,
+    app_key: config.appKey,
     ...extra
   };
 }

@@ -12,6 +12,7 @@
     "test": "vitest run --config vitest.config.js"
   },
   "dependencies": {
+    "@fontsource/noto-sans-sc": "^5.2.9",
     "@vitejs/plugin-react": "^5.1.1",
     "cors": "^2.8.5",
     "docx": "^9.5.1",
@@ -22,6 +23,7 @@
     "multer": "^2.0.2",
     "nanoid": "^5.1.6",
     "pdfjs-dist": "^5.4.394",
+    "pdfkit": "^0.18.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tesseract.js": "^6.0.1"
