@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ppt-translate
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: DEEPL_API_KEY
+        sync: false
+      - key: MATHPIX_APP_ID
+        sync: false
+      - key: MATHPIX_APP_KEY
+        sync: false
+      - key: ENABLE_LOCAL_OCR
+        value: "false"
