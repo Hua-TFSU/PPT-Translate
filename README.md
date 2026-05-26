@@ -11,10 +11,10 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - PPTX image previews in the OCR panel through `/api/jobs/:jobId/images/:imageId/original`.
 - PDF text-layer extraction through `pdfjs-dist`.
 - Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
-- Login screen for the web workspace and browser-side persistence of each user's runtime keys and glossary.
-- Translation provider chain: OpenAI, DeepSeek, DeepL, then a safe unconfigured fallback.
+- Login and registration screen for the web workspace, with browser-side persistence of each user's runtime keys and glossary.
+- Translation provider chain: OpenAI, DeepSeek, Doubao, DeepL, then a safe unconfigured fallback.
 - Formula guard for math-heavy PDFs: formula-like snippets are replaced with placeholders before translation and restored exactly afterward, with a consistency summary in exports.
-- Runtime key API for OpenAI, DeepSeek, and Mathpix credentials.
+- Runtime key API for OpenAI, DeepSeek, Doubao, and Mathpix credentials.
 - Glossary API and UI. Saved terms are sent to the model prompt and enforced during translation.
 - Export API: JSON, Markdown, DOCX, PDF.
 - Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
@@ -79,6 +79,8 @@ curl -X PUT http://localhost:4000/api/settings/model-keys \
     "openaiModel": "gpt-4.1-mini",
     "deepseekApiKey": "sk-...",
     "deepseekModel": "deepseek-v4-flash",
+    "doubaoApiKey": "volcengine-ark-key",
+    "doubaoModel": "doubao-seed-1-6-251015",
     "mathpixAppId": "app_id",
     "mathpixAppKey": "app_key"
   }'
@@ -104,7 +106,10 @@ curl -X PUT http://localhost:4000/api/settings/glossary \
 | `OPENAI_MODEL` | OpenAI model name, defaults to `gpt-4.1-mini`. |
 | `DEEPSEEK_API_KEY` | Enables DeepSeek translation. |
 | `DEEPSEEK_MODEL` | DeepSeek model name, defaults to `deepseek-v4-flash`. |
-| `PREFERRED_TRANSLATION_PROVIDER` | `auto`, `openai`, or `deepseek`. |
+| `DOUBAO_API_KEY` | Enables Doubao through Volcengine Ark. |
+| `DOUBAO_MODEL` | Doubao model or Ark endpoint id, defaults to `doubao-seed-1-6-251015`. |
+| `DOUBAO_API_URL` | Doubao OpenAI-compatible chat completions endpoint. |
+| `PREFERRED_TRANSLATION_PROVIDER` | `auto`, `openai`, `deepseek`, or `doubao`. |
 | `DEEPL_API_KEY` | Enables DeepL translation if OpenAI is not configured. |
 | `MATHPIX_APP_ID` / `MATHPIX_APP_KEY` | Enables dedicated Mathpix OCR for scanned PDFs and formulas. |
 | `ENABLE_LOCAL_OCR` | Enables slower local OCR for extracted PPT image assets. |
@@ -116,7 +121,7 @@ curl -X PUT http://localhost:4000/api/settings/glossary \
 
 1. Push this repository to GitHub.
 2. In Render, create a Blueprint from the repository.
-3. Add the secret environment variables for OpenAI/DeepSeek/DeepL/Mathpix when you want server-level defaults.
+3. Add the secret environment variables for OpenAI/DeepSeek/Doubao/DeepL/Mathpix when you want server-level defaults.
 4. Deploy.
 
 The included `render.yaml` already defines the Node web service build and start commands.

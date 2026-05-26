@@ -29,9 +29,18 @@ export async function translateSegments(segments, sourceLang, targetLang) {
   }
 
   if (providerConfig.preferredProvider === "deepseek" && providerConfig.deepseek.apiKey) {
-    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, {
+    return translateWithChatCompletions(cleanSegments, sourceLang, targetLang, {
       ...providerConfig.deepseek,
-      glossary: providerConfig.glossary
+      glossary: providerConfig.glossary,
+      providerName: "deepseek"
+    });
+  }
+
+  if (providerConfig.preferredProvider === "doubao" && providerConfig.doubao.apiKey) {
+    return translateWithChatCompletions(cleanSegments, sourceLang, targetLang, {
+      ...providerConfig.doubao,
+      glossary: providerConfig.glossary,
+      providerName: "doubao"
     });
   }
 
@@ -43,9 +52,18 @@ export async function translateSegments(segments, sourceLang, targetLang) {
   }
 
   if (providerConfig.deepseek.apiKey) {
-    return translateWithDeepSeek(cleanSegments, sourceLang, targetLang, {
+    return translateWithChatCompletions(cleanSegments, sourceLang, targetLang, {
       ...providerConfig.deepseek,
-      glossary: providerConfig.glossary
+      glossary: providerConfig.glossary,
+      providerName: "deepseek"
+    });
+  }
+
+  if (providerConfig.doubao.apiKey) {
+    return translateWithChatCompletions(cleanSegments, sourceLang, targetLang, {
+      ...providerConfig.doubao,
+      glossary: providerConfig.glossary,
+      providerName: "doubao"
     });
   }
 
@@ -143,7 +161,7 @@ async function translateWithOpenAI(segments, sourceLang, targetLang, config) {
   return translated;
 }
 
-async function translateWithDeepSeek(segments, sourceLang, targetLang, config) {
+async function translateWithChatCompletions(segments, sourceLang, targetLang, config) {
   const translated = [];
 
   for (const batch of chunk(segments, 12)) {
@@ -185,7 +203,7 @@ async function translateWithDeepSeek(segments, sourceLang, targetLang, config) {
 
     if (!response.ok) {
       const detail = await response.text();
-      throw new Error(`DeepSeek translation failed: ${response.status} ${detail}`);
+      throw new Error(`${config.providerName || "chat"} translation failed: ${response.status} ${detail}`);
     }
 
     const payload = await response.json();
@@ -196,7 +214,7 @@ async function translateWithDeepSeek(segments, sourceLang, targetLang, config) {
     translated.push(
       ...batch.map((segment) => ({
         ...applyFormulaGuard(
-          { ...segment, provider: `deepseek:${config.model}` },
+          { ...segment, provider: `${config.providerName || "chat"}:${config.model}` },
           byId.get(segment.id) || segment.sourceText
         )
       }))

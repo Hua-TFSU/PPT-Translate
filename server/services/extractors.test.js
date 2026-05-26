@@ -98,12 +98,15 @@ describe("document pipeline", () => {
     const openaiKey = process.env.OPENAI_API_KEY;
     const deeplKey = process.env.DEEPL_API_KEY;
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    const doubaoKey = process.env.DOUBAO_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.DEEPL_API_KEY;
     delete process.env.DEEPSEEK_API_KEY;
+    delete process.env.DOUBAO_API_KEY;
     updateModelKeys({
       clearOpenAI: true,
       clearDeepSeek: true,
+      clearDoubao: true,
       preferredProvider: "auto"
     });
 
@@ -119,6 +122,8 @@ describe("document pipeline", () => {
     else process.env.DEEPL_API_KEY = deeplKey;
     if (deepseekKey === undefined) delete process.env.DEEPSEEK_API_KEY;
     else process.env.DEEPSEEK_API_KEY = deepseekKey;
+    if (doubaoKey === undefined) delete process.env.DOUBAO_API_KEY;
+    else process.env.DOUBAO_API_KEY = doubaoKey;
 
     expect(translated[0].translatedText).toBe("Hello world");
     expect(translated[0].provider).toBe("unconfigured");
@@ -156,6 +161,8 @@ describe("document pipeline", () => {
       preferredProvider: "deepseek",
       deepseekApiKey: "sk-deepseek-test-key",
       deepseekModel: "deepseek-v4-flash",
+      doubaoApiKey: "volcengine-doubao-test-key",
+      doubaoModel: "doubao-seed-1-6-251015",
       mathpixAppId: "test-mathpix-id",
       mathpixAppKey: "test-mathpix-secret"
     });
@@ -163,12 +170,15 @@ describe("document pipeline", () => {
     expect(status.preferredProvider).toBe("deepseek");
     expect(status.deepseek.configured).toBe(true);
     expect(status.deepseek.keyPreview).toBe("sk-...-key");
+    expect(status.doubao.configured).toBe(true);
+    expect(status.doubao.keyPreview).toBe("vol...-key");
     expect(status.mathpix.configured).toBe(true);
     expect(status.mathpix.appIdPreview).toBe("tes...x-id");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("deepseek-test");
+    expect(JSON.stringify(getModelKeyStatus())).not.toContain("doubao-test");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("mathpix-secret");
 
-    updateModelKeys({ clearDeepSeek: true, clearMathpix: true, preferredProvider: "auto" });
+    updateModelKeys({ clearDeepSeek: true, clearDoubao: true, clearMathpix: true, preferredProvider: "auto" });
   });
 
   it("stores glossary terms for translation prompts", () => {

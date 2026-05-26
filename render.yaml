@@ -18,6 +18,12 @@ services:
         sync: false
       - key: DEEPSEEK_MODEL
         value: deepseek-v4-flash
+      - key: DOUBAO_API_KEY
+        sync: false
+      - key: DOUBAO_MODEL
+        value: doubao-seed-1-6-251015
+      - key: DOUBAO_API_URL
+        value: https://ark.cn-beijing.volces.com/api/v3/chat/completions
       - key: PREFERRED_TRANSLATION_PROVIDER
         value: auto
       - key: DEEPL_API_KEY

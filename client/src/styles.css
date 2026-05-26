@@ -49,6 +49,29 @@ input {
   margin-bottom: 24px;
 }
 
+.authSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.authSwitch button {
+  min-height: 40px;
+  border: 1px solid #d8e2dd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #41504a;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.authSwitch button.active {
+  border-color: #287c71;
+  background: #e5f4f1;
+  color: #164d47;
+}
+
 .loginForm {
   display: grid;
   gap: 14px;
@@ -312,7 +335,7 @@ h1 {
 
 .providerSelect {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -364,6 +387,12 @@ h1 {
   color: #164d47;
   font-size: 13px;
   font-weight: 800;
+}
+
+.keyLinks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .jobItem {
@@ -670,6 +699,11 @@ h1 {
 
   .exportButtons a {
     min-width: 76px;
+  }
+
+  .providerSelect,
+  .keyLinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .termRow {

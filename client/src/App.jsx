@@ -40,11 +40,15 @@ const emptyKeyForm = {
   openaiModel: "gpt-4.1-mini",
   deepseekApiKey: "",
   deepseekModel: "deepseek-v4-flash",
+  doubaoApiKey: "",
+  doubaoModel: "doubao-seed-1-6-251015",
   mathpixAppId: "",
   mathpixAppKey: ""
 };
 
 const emptyTerm = { source: "", target: "", note: "" };
+const accountsKey = "pptTranslate:accounts";
+const providerOptions = ["auto", "openai", "deepseek", "doubao"];
 
 function statusLabel(status) {
   return {
@@ -70,7 +74,8 @@ function loadJson(key, fallback) {
 
 function App() {
   const [currentUser, setCurrentUser] = useState(() => window.localStorage.getItem("pptTranslate:user") || "");
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  const [authMode, setAuthMode] = useState("login");
+  const [loginForm, setLoginForm] = useState({ username: "", password: "", confirmPassword: "" });
   const [file, setFile] = useState(null);
   const [direction, setDirection] = useState(directions[0]);
   const [ocrMode, setOcrMode] = useState("auto");
@@ -137,7 +142,8 @@ function App() {
         ...current,
         preferredProvider: payload.preferredProvider || "auto",
         openaiModel: payload.openai?.model || current.openaiModel,
-        deepseekModel: payload.deepseek?.model || current.deepseekModel
+        deepseekModel: payload.deepseek?.model || current.deepseekModel,
+        doubaoModel: payload.doubao?.model || current.doubaoModel
       }));
     }
   }
@@ -147,7 +153,14 @@ function App() {
     const savedGlossary = loadJson(storageKey(user, "glossary"), null);
 
     if (savedKeys) {
-      setKeyForm((current) => ({ ...current, ...savedKeys, openaiApiKey: "", deepseekApiKey: "", mathpixAppKey: "" }));
+      setKeyForm((current) => ({
+        ...current,
+        ...savedKeys,
+        openaiApiKey: "",
+        deepseekApiKey: "",
+        doubaoApiKey: "",
+        mathpixAppKey: ""
+      }));
       await fetch("/api/settings/model-keys", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -169,10 +182,58 @@ function App() {
   function login(event) {
     event.preventDefault();
     const username = loginForm.username.trim();
+    const password = loginForm.password;
     if (!username) {
       setError("请输入用户名");
       return;
     }
+    const accounts = loadJson(accountsKey, {});
+    if (!accounts[username]) {
+      setError("用户不存在，请先注册");
+      setAuthMode("register");
+      return;
+    }
+    if (accounts[username].password !== password) {
+      setError("密码不正确");
+      return;
+    }
+    window.localStorage.setItem("pptTranslate:user", username);
+    setCurrentUser(username);
+    setError("");
+  }
+
+  function register(event) {
+    event.preventDefault();
+    const username = loginForm.username.trim();
+    const password = loginForm.password;
+    if (!username) {
+      setError("请输入用户名");
+      return;
+    }
+    if (password.length < 6) {
+      setError("密码至少 6 位");
+      return;
+    }
+    if (password !== loginForm.confirmPassword) {
+      setError("两次密码不一致");
+      return;
+    }
+
+    const accounts = loadJson(accountsKey, {});
+    if (accounts[username]) {
+      setError("用户已存在，请直接登录");
+      setAuthMode("login");
+      return;
+    }
+
+    const nextAccounts = {
+      ...accounts,
+      [username]: {
+        password,
+        createdAt: new Date().toISOString()
+      }
+    };
+    window.localStorage.setItem(accountsKey, JSON.stringify(nextAccounts));
     window.localStorage.setItem("pptTranslate:user", username);
     setCurrentUser(username);
     setError("");
@@ -236,8 +297,10 @@ function App() {
       preferredProvider: keyForm.preferredProvider,
       openaiModel: keyForm.openaiModel,
       deepseekModel: keyForm.deepseekModel,
+      doubaoModel: keyForm.doubaoModel,
       ...(keyForm.openaiApiKey.trim() ? { openaiApiKey: keyForm.openaiApiKey.trim() } : {}),
       ...(keyForm.deepseekApiKey.trim() ? { deepseekApiKey: keyForm.deepseekApiKey.trim() } : {}),
+      ...(keyForm.doubaoApiKey.trim() ? { doubaoApiKey: keyForm.doubaoApiKey.trim() } : {}),
       ...(keyForm.mathpixAppId.trim() ? { mathpixAppId: keyForm.mathpixAppId.trim() } : {}),
       ...(keyForm.mathpixAppKey.trim() ? { mathpixAppKey: keyForm.mathpixAppKey.trim() } : {})
     };
@@ -256,6 +319,7 @@ function App() {
         ...current,
         openaiApiKey: "",
         deepseekApiKey: "",
+        doubaoApiKey: "",
         mathpixAppKey: ""
       }));
     } catch (keyError) {
@@ -337,7 +401,29 @@ function App() {
         <section className="loginPanel">
           <p className="eyebrow">PPT-Translate</p>
           <h1>智能PPT翻译系统</h1>
-          <form onSubmit={login} className="loginForm">
+          <div className="authSwitch">
+            <button
+              type="button"
+              className={authMode === "login" ? "active" : ""}
+              onClick={() => {
+                setAuthMode("login");
+                setError("");
+              }}
+            >
+              登录
+            </button>
+            <button
+              type="button"
+              className={authMode === "register" ? "active" : ""}
+              onClick={() => {
+                setAuthMode("register");
+                setError("");
+              }}
+            >
+              注册
+            </button>
+          </div>
+          <form onSubmit={authMode === "register" ? register : login} className="loginForm">
             <label>
               用户名
               <input
@@ -352,12 +438,25 @@ function App() {
                 type="password"
                 value={loginForm.password}
                 onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
-                placeholder="本地演示登录"
+                placeholder={authMode === "register" ? "至少 6 位" : "请输入密码"}
               />
             </label>
+            {authMode === "register" && (
+              <label>
+                确认密码
+                <input
+                  type="password"
+                  value={loginForm.confirmPassword}
+                  onChange={(event) =>
+                    setLoginForm((current) => ({ ...current, confirmPassword: event.target.value }))
+                  }
+                  placeholder="再次输入密码"
+                />
+              </label>
+            )}
             <button className="primaryAction" type="submit">
               <ArrowRight size={18} />
-              登录
+              {authMode === "register" ? "注册并登录" : "登录"}
             </button>
             {error && (
               <p className="notice error">
@@ -462,7 +561,7 @@ function App() {
                 模型 Key
               </div>
               <div className="providerSelect">
-                {["auto", "openai", "deepseek"].map((provider) => (
+                {providerOptions.map((provider) => (
                   <button
                     key={provider}
                     type="button"
@@ -502,6 +601,20 @@ function App() {
                 onChange={(event) => setKeyForm((current) => ({ ...current, deepseekModel: event.target.value }))}
               />
               <label className="keyField">
+                字节豆包
+                <input
+                  type="password"
+                  placeholder={keyStatus?.doubao?.configured ? keyStatus.doubao.keyPreview : "Volcengine Ark API Key"}
+                  value={keyForm.doubaoApiKey}
+                  onChange={(event) => setKeyForm((current) => ({ ...current, doubaoApiKey: event.target.value }))}
+                />
+              </label>
+              <input
+                className="modelInput"
+                value={keyForm.doubaoModel}
+                onChange={(event) => setKeyForm((current) => ({ ...current, doubaoModel: event.target.value }))}
+              />
+              <label className="keyField">
                 Mathpix App ID
                 <input
                   placeholder={keyStatus?.mathpix?.configured ? keyStatus.mathpix.appIdPreview : "app_id"}
@@ -518,10 +631,26 @@ function App() {
                   onChange={(event) => setKeyForm((current) => ({ ...current, mathpixAppKey: event.target.value }))}
                 />
               </label>
-              <a className="secondaryLink" href="https://console.mathpix.com" target="_blank" rel="noreferrer">
-                <ExternalLink size={15} />
-                申请 Mathpix Key
-              </a>
+              <div className="keyLinks">
+                <a
+                  className="secondaryLink"
+                  href="https://console.volcengine.com/ark"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink size={15} />
+                  豆包 Key
+                </a>
+                <a
+                  className="secondaryLink"
+                  href="https://console.mathpix.com/ocr-api"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink size={15} />
+                  Mathpix Key
+                </a>
+              </div>
               <button className="secondaryAction" type="submit" disabled={isSavingKeys}>
                 {isSavingKeys ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
                 保存 Key

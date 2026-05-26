@@ -8,6 +8,10 @@ const runtimeConfig = {
     apiKey: "",
     model: ""
   },
+  doubao: {
+    apiKey: "",
+    model: ""
+  },
   mathpix: {
     appId: "",
     appKey: ""
@@ -36,6 +40,14 @@ export function updateModelKeys(input = {}) {
     runtimeConfig.deepseek.model = input.deepseekModel.trim();
   }
 
+  if (typeof input.doubaoApiKey === "string" && input.doubaoApiKey.trim()) {
+    runtimeConfig.doubao.apiKey = input.doubaoApiKey.trim();
+  }
+
+  if (typeof input.doubaoModel === "string" && input.doubaoModel.trim()) {
+    runtimeConfig.doubao.model = input.doubaoModel.trim();
+  }
+
   if (typeof input.mathpixAppId === "string" && input.mathpixAppId.trim()) {
     runtimeConfig.mathpix.appId = input.mathpixAppId.trim();
   }
@@ -50,6 +62,10 @@ export function updateModelKeys(input = {}) {
 
   if (input.clearDeepSeek === true) {
     runtimeConfig.deepseek.apiKey = "";
+  }
+
+  if (input.clearDoubao === true) {
+    runtimeConfig.doubao.apiKey = "";
   }
 
   if (input.clearMathpix === true) {
@@ -94,6 +110,14 @@ export function getProviderConfig() {
         "deepseek-v4-flash",
       apiUrl: process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/chat/completions"
     },
+    doubao: {
+      apiKey: runtimeConfig.doubao.apiKey || process.env.DOUBAO_API_KEY || "",
+      model:
+        runtimeConfig.doubao.model ||
+        process.env.DOUBAO_MODEL ||
+        "doubao-seed-1-6-251015",
+      apiUrl: process.env.DOUBAO_API_URL || "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+    },
     glossary: runtimeConfig.glossary
   };
 }
@@ -124,6 +148,17 @@ export function getModelKeyStatus() {
           : "none",
       keyPreview: maskKey(providerConfig.deepseek.apiKey),
       model: providerConfig.deepseek.model
+    },
+    doubao: {
+      configured: Boolean(providerConfig.doubao.apiKey),
+      source: runtimeConfig.doubao.apiKey
+        ? "runtime"
+        : process.env.DOUBAO_API_KEY
+          ? "env"
+          : "none",
+      keyPreview: maskKey(providerConfig.doubao.apiKey),
+      model: providerConfig.doubao.model,
+      apiUrl: providerConfig.doubao.apiUrl
     },
     mathpix: {
       configured: Boolean(getMathpixConfig().appId && getMathpixConfig().appKey),
