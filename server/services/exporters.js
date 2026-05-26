@@ -44,8 +44,13 @@ export function buildMarkdown(job) {
       lines.push(`### ${image.location}`, "");
       lines.push(`- Provider: ${image.ocrProvider || "none"}`);
       lines.push(`- File: ${image.filename}`);
+      if (image.redrawnSvgPath) lines.push(`- Redrawn SVG: ${image.redrawnSvgPath}`);
       lines.push("");
       lines.push(image.ocrText || "No OCR text", "");
+      if (image.translatedOcrText) {
+        lines.push("**Translated OCR**", "");
+        lines.push(image.translatedOcrText, "");
+      }
     }
   }
 
@@ -106,6 +111,13 @@ export async function buildDocx(job) {
       children.push(new Paragraph({ text: image.location, heading: HeadingLevel.HEADING_2 }));
       children.push(new Paragraph(`Provider: ${image.ocrProvider || "none"}`));
       children.push(new Paragraph(image.ocrText || "No OCR text"));
+      if (image.translatedOcrText) {
+        children.push(new Paragraph("Translated OCR"));
+        children.push(new Paragraph(image.translatedOcrText));
+      }
+      if (image.redrawnSvgPath) {
+        children.push(new Paragraph(`Redrawn SVG: ${image.redrawnSvgPath}`));
+      }
     }
   }
 

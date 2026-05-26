@@ -345,7 +345,7 @@ h1 {
   background: #fff;
 }
 
-.imageItem div {
+.imageItem div:first-child {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -359,6 +359,38 @@ h1 {
   color: #53615b;
   overflow-wrap: anywhere;
   line-height: 1.55;
+}
+
+.imageItem .translatedOcr {
+  margin-top: 10px;
+  color: #25342f;
+}
+
+.imageActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.imageActions button,
+.imageActions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d8e2dd;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #26342f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.imageActions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .spin {

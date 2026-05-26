@@ -168,6 +168,7 @@ async function extractPptx(filepath, ocrMode) {
       if (image.ocrText?.trim()) {
         segments.push({
           id: nanoid(8),
+          imageId: image.id,
           location: `${image.location} OCR`,
           kind: "image-ocr",
           sourceText: image.ocrText.trim()

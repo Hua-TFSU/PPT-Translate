@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { buildDocx, buildMarkdown } from "./exporters.js";
 import { extractDocument } from "./extractors.js";
+import { createRedrawnFigure } from "./redraw.js";
 import { translateSegments } from "./translator.js";
 
 describe("document pipeline", () => {
@@ -90,5 +91,19 @@ describe("document pipeline", () => {
     const docx = await buildDocx(job);
     expect(Buffer.isBuffer(docx)).toBe(true);
     expect(docx.length).toBeGreaterThan(1000);
+  });
+
+  it("creates editable SVG for an OCR image redraw", () => {
+    const svg = createRedrawnFigure({
+      image: {
+        location: "Slide 2 Image 1",
+        ocrText: "原图文字",
+        translatedOcrText: "Translated figure text"
+      }
+    });
+
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("Translated figure text");
+    expect(svg).toContain("Slide 2 Image 1");
   });
 });

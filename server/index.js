@@ -7,6 +7,7 @@ import multer from "multer";
 import { createJob, getJob, listJobs, toPublicJob, updateJob } from "./lib/jobs.js";
 import { buildDocx, buildMarkdown } from "./services/exporters.js";
 import { extractDocument } from "./services/extractors.js";
+import { createRedrawnFigure } from "./services/redraw.js";
 import { translateSegments } from "./services/translator.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -140,6 +141,77 @@ app.get("/api/jobs/:id/export", async (request, response) => {
   response.send(JSON.stringify(toPublicJob(job), null, 2));
 });
 
+app.post("/api/jobs/:id/images/:imageId/redraw", async (request, response) => {
+  const job = getJob(request.params.id);
+  if (!job) {
+    response.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  if (job.status !== "completed") {
+    response.status(409).json({ error: "Job is not completed" });
+    return;
+  }
+
+  const image = job.result?.images?.find((item) => item.id === request.params.imageId);
+  if (!image) {
+    response.status(404).json({ error: "Image not found" });
+    return;
+  }
+
+  const svg = createRedrawnFigure({
+    image,
+    title: request.body?.title || image.location,
+    text: request.body?.text || image.translatedOcrText || image.ocrText
+  });
+  const redrawDir = path.join(uploadDir, "redrawn");
+  await fs.mkdir(redrawDir, { recursive: true });
+  const svgName = `${job.id}-${image.id}.svg`;
+  const svgPath = path.join(redrawDir, svgName);
+  await fs.writeFile(svgPath, svg, "utf8");
+
+  const images = job.result.images.map((item) =>
+    item.id === image.id
+      ? {
+          ...item,
+          redrawnSvgPath: `/api/jobs/${job.id}/images/${image.id}/redraw.svg`,
+          redrawProvider: "svg-redraw-v1",
+          redrawnAt: new Date().toISOString()
+        }
+      : item
+  );
+
+  const updated = updateJob(job.id, {
+    result: {
+      ...job.result,
+      images
+    }
+  });
+
+  response.status(201).json({
+    image: updated.result.images.find((item) => item.id === image.id)
+  });
+});
+
+app.get("/api/jobs/:id/images/:imageId/redraw.svg", async (request, response) => {
+  const job = getJob(request.params.id);
+  if (!job) {
+    response.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  const image = job.result?.images?.find((item) => item.id === request.params.imageId);
+  if (!image?.redrawnSvgPath) {
+    response.status(404).json({ error: "Redrawn image not found" });
+    return;
+  }
+
+  const svgPath = path.join(uploadDir, "redrawn", `${job.id}-${image.id}.svg`);
+  response.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+  response.setHeader("Content-Disposition", `attachment; filename="${job.id}-${image.id}.svg"`);
+  response.send(await fs.readFile(svgPath, "utf8"));
+});
+
 if (isProduction) {
   const clientDir = path.join(rootDir, "dist/client");
   app.use(express.static(clientDir));
@@ -180,6 +252,7 @@ async function processJob(jobId) {
       job.sourceLang,
       job.targetLang
     );
+    const translatedImages = attachImageTranslations(extracted.images, translatedSegments);
 
     const warnings = [...(extracted.warnings || [])];
     if (translatedSegments.some((segment) => segment.provider === "unconfigured")) {
@@ -194,6 +267,7 @@ async function processJob(jobId) {
         ...extracted,
         warnings,
         segments: translatedSegments,
+        images: translatedImages,
         completedAt: new Date().toISOString()
       }
     });
@@ -205,4 +279,18 @@ async function processJob(jobId) {
       error: error.message
     });
   }
+}
+
+function attachImageTranslations(images = [], segments = []) {
+  if (!images.length) return images;
+  const translatedByImageId = new Map(
+    segments
+      .filter((segment) => segment.kind === "image-ocr" && segment.imageId)
+      .map((segment) => [segment.imageId, segment.translatedText])
+  );
+
+  return images.map((image) => ({
+    ...image,
+    translatedOcrText: translatedByImageId.get(image.id) || ""
+  }));
 }

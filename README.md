@@ -12,6 +12,7 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - Mathpix integration path for dedicated PDF OCR and formula-to-Markdown recognition.
 - Translation provider chain: OpenAI, DeepL, then a safe unconfigured fallback.
 - Export API: JSON, Markdown, DOCX.
+- Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
 - Render deployment blueprint through `render.yaml`.
 
 ## Run Locally
@@ -50,6 +51,13 @@ curl http://localhost:4000/api/jobs/<jobId>
 curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=markdown" -o translated.md
 curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=json" -o translated.json
 curl -L "http://localhost:4000/api/jobs/<jobId>/export?format=docx" -o translated.docx
+```
+
+### Redraw OCR Images
+
+```bash
+curl -X POST http://localhost:4000/api/jobs/<jobId>/images/<imageId>/redraw
+curl -L http://localhost:4000/api/jobs/<jobId>/images/<imageId>/redraw.svg -o redrawn.svg
 ```
 
 ## Environment Variables

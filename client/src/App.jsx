@@ -39,6 +39,7 @@ function App() {
   const [job, setJob] = useState(null);
   const [error, setError] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [redrawingId, setRedrawingId] = useState("");
   const [jobs, setJobs] = useState([]);
   const fileInputRef = useRef(null);
 
@@ -107,6 +108,29 @@ function App() {
 
   function exportUrl(format) {
     return job?.id ? `/api/jobs/${job.id}/export?format=${format}` : "#";
+  }
+
+  async function redrawImage(imageId) {
+    if (!job?.id) return;
+    setRedrawingId(imageId);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/images/${imageId}/redraw`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "重新制图失败");
+      const jobResponse = await fetch(`/api/jobs/${job.id}`);
+      const jobPayload = await jobResponse.json();
+      if (jobResponse.ok) setJob(jobPayload.job);
+    } catch (redrawError) {
+      setError(redrawError.message);
+    } finally {
+      setRedrawingId("");
+    }
   }
 
   return (
@@ -288,6 +312,23 @@ function App() {
                     <small>{item.ocrProvider || "未识别"}</small>
                   </div>
                   <p>{item.ocrText || "无 OCR 文本"}</p>
+                  {item.translatedOcrText && <p className="translatedOcr">{item.translatedOcrText}</p>}
+                  <div className="imageActions">
+                    <button
+                      type="button"
+                      onClick={() => redrawImage(item.id)}
+                      disabled={redrawingId === item.id}
+                    >
+                      {redrawingId === item.id ? <Loader2 className="spin" size={15} /> : <RefreshCcw size={15} />}
+                      重新制图
+                    </button>
+                    {item.redrawnSvgPath && (
+                      <a href={item.redrawnSvgPath}>
+                        <Download size={15} />
+                        SVG
+                      </a>
+                    )}
+                  </div>
                 </article>
               ))}
             </div>
