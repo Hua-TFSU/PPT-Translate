@@ -73,6 +73,8 @@ curl -L http://localhost:4000/api/jobs/<jobId>/images/<imageId>/redraw.svg -o re
 
 ## Deploy To Render
 
+[Deploy to Render](https://render.com/deploy?repo=https://github.com/Hua-TFSU/PPT-Translate)
+
 1. Push this repository to GitHub.
 2. In Render, create a Blueprint from the repository.
 3. Add the secret environment variables for OpenAI/DeepL/Mathpix.
