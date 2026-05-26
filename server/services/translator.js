@@ -11,6 +11,9 @@ const languageNames = {
   es: "Spanish"
 };
 
+const translationSystemPrompt =
+  "You are a professional academic and presentation translator. Translate all natural-language prose completely into the target language. If the target language is Chinese, use fluent Simplified Chinese. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve equations, citations, units, numbers, proper names, institution names, model names, and technical acronyms such as AI, PV, SOC, GA, MbA. Do not leave full English sentences or ordinary English clauses untranslated unless they are proper names, acronyms, formulas, references, or units. Repair PDF line breaks and hyphenation when translating. Return only valid JSON.";
+
 export async function translateSegments(segments, sourceLang, targetLang) {
   const cleanSegments = prepareSegmentsForTranslation(
     segments.filter((segment) => segment.sourceText?.trim())
@@ -59,8 +62,7 @@ async function translateWithOpenAI(segments, sourceLang, targetLang, config) {
         input: [
           {
             role: "system",
-            content:
-              "You are a professional presentation translator. Translate faithfully. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve markdown, numbers, names, and slide structure. Return only valid JSON."
+            content: translationSystemPrompt
           },
           {
             role: "user",
@@ -143,8 +145,7 @@ async function translateWithDeepSeek(segments, sourceLang, targetLang, config) {
         messages: [
           {
             role: "system",
-            content:
-              "You are a professional presentation translator. Translate faithfully. Preserve every [[FORMULA_N]] placeholder exactly as given; do not translate, delete, reorder, or edit those placeholders. Preserve markdown, numbers, names, and slide structure. Return only valid JSON."
+            content: translationSystemPrompt
           },
           {
             role: "user",

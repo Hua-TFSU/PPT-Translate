@@ -4,7 +4,7 @@ import path from "node:path";
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { buildDocx, buildMarkdown } from "./exporters.js";
-import { extractDocument } from "./extractors.js";
+import { extractDocument, textContentToLines } from "./extractors.js";
 import {
   applyFormulaGuard,
   checkFormulaConsistency,
@@ -51,6 +51,24 @@ describe("document pipeline", () => {
     expect(result.segments).toHaveLength(2);
     expect(result.segments[0].sourceText).toBe("项目目标");
     expect(result.segments[1].sourceText).toContain("导出译文");
+  });
+
+  it("orders two-column PDF text by column instead of row interleaving", () => {
+    const items = [
+      { str: "Paper Title", transform: [1, 0, 0, 1, 80, 760], width: 440 }
+    ];
+
+    for (let index = 0; index < 9; index += 1) {
+      const y = 720 - index * 16;
+      items.push(
+        { str: `left-${index}`, transform: [1, 0, 0, 1, 50, y], width: 80 },
+        { str: `right-${index}`, transform: [1, 0, 0, 1, 340, y], width: 90 }
+      );
+    }
+
+    const output = textContentToLines(items, 600);
+    expect(output.indexOf("left-8")).toBeLessThan(output.indexOf("right-0"));
+    expect(output).not.toContain("left-0 right-0");
   });
 
   it("preserves text when no translation provider is configured", async () => {

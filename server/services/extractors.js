@@ -76,14 +76,17 @@ async function extractPdf(filepath, filename, ocrMode) {
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
-    const pageText = textContentToLines(content.items);
+    const viewport = page.getViewport({ scale: 1 });
+    const pageText = textContentToLines(content.items, viewport.width);
 
     if (pageText.trim()) {
-      segments.push({
+      splitTextBlocks(pageText).forEach((block, index, blocks) => {
+        segments.push({
         id: nanoid(8),
-        location: `Page ${pageNumber}`,
+          location: blocks.length > 1 ? `Page ${pageNumber}.${index + 1}` : `Page ${pageNumber}`,
         kind: "text",
-        sourceText: pageText.trim()
+          sourceText: block
+        });
       });
     }
   }
@@ -103,29 +106,203 @@ async function extractPdf(filepath, filename, ocrMode) {
   };
 }
 
-function textContentToLines(items) {
-  const rows = new Map();
-  for (const item of items) {
-    if (!item.str?.trim()) continue;
-    const y = Math.round(item.transform?.[5] || 0);
-    const x = item.transform?.[4] || 0;
-    const row = rows.get(y) || [];
-    row.push({ x, text: item.str });
-    rows.set(y, row);
+export function textContentToLines(items, pageWidth = 0) {
+  const normalizedItems = items.filter((item) => item.str?.trim());
+  if (pageWidth && isColumnMajorTextStream(normalizedItems, pageWidth)) {
+    return streamOrderTextContentToLines(normalizedItems, pageWidth);
   }
 
-  return Array.from(rows.entries())
-    .sort(([a], [b]) => b - a)
-    .map(([, row]) =>
-      row
-        .sort((a, b) => a.x - b.x)
-        .map((item) => item.text)
+  const rows = [];
+  for (const item of normalizedItems) {
+    const y = item.transform?.[5] || 0;
+    const x = item.transform?.[4] || 0;
+    const width = item.width || 0;
+    const row = findRow(rows, y);
+    row.items.push({ x, width, text: item.str });
+  }
+
+  const lines = rows.flatMap((row) => splitRowIntoColumnLines(row.items, row.y, pageWidth));
+  const twoColumn = hasTwoColumnLayout(lines, pageWidth);
+  const orderedLines = twoColumn ? orderTwoColumnLines(lines, pageWidth) : orderLinesTopDown(lines);
+
+  return orderedLines
+    .map((line) => line.text)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function isColumnMajorTextStream(items, pageWidth) {
+  const midpoint = pageWidth / 2;
+  const sides = items
+    .map((item) => (item.transform?.[4] || 0) < midpoint)
+    .filter((side) => typeof side === "boolean");
+  let switches = 0;
+  for (let index = 1; index < sides.length; index += 1) {
+    if (sides[index] !== sides[index - 1]) switches += 1;
+  }
+  const leftCount = sides.filter(Boolean).length;
+  const rightCount = sides.length - leftCount;
+  return leftCount >= 20 && rightCount >= 20 && switches <= 10;
+}
+
+function streamOrderTextContentToLines(items, pageWidth) {
+  const midpoint = pageWidth / 2;
+  const lines = [];
+  let current = null;
+
+  for (const item of items) {
+    const text = item.str.trim();
+    const x = item.transform?.[4] || 0;
+    const y = item.transform?.[5] || 0;
+    const width = item.width || 0;
+    const itemEnd = x + width;
+    const sameRow = current && Math.abs(y - current.y) <= 3;
+    const crossesToRightColumn =
+      sameRow && current.minX < midpoint && x >= midpoint && current.maxX <= midpoint + 5;
+    const xReset = sameRow && x < current.lastX - 8;
+    const newLine = !current || !sameRow || xReset || crossesToRightColumn;
+
+    if (newLine) {
+      if (current) lines.push(finalizeStreamLine(current));
+      if (current && y > current.y + 80 && x >= midpoint) {
+        lines.push({ text: "" });
+      }
+      current = { y, minX: x, maxX: itemEnd, lastX: itemEnd, parts: [text] };
+    } else {
+      current.parts.push(text);
+      current.maxX = Math.max(current.maxX, itemEnd);
+      current.lastX = itemEnd;
+    }
+  }
+
+  if (current) lines.push(finalizeStreamLine(current));
+  return lines
+    .map((line) => line.text)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function finalizeStreamLine(line) {
+  return {
+    text: dehyphenateLine(
+      line.parts
         .join(" ")
         .replace(/\s+/g, " ")
         .trim()
     )
-    .filter(Boolean)
-    .join("\n");
+  };
+}
+
+function findRow(rows, y) {
+  const existing = rows.find((row) => Math.abs(row.y - y) <= 3);
+  if (existing) return existing;
+  const row = { y, items: [] };
+  rows.push(row);
+  return row;
+}
+
+function splitRowIntoColumnLines(items, y, pageWidth) {
+  const sorted = items.slice().sort((a, b) => a.x - b.x);
+  const midpoint = pageWidth ? pageWidth / 2 : 0;
+
+  if (midpoint) {
+    const leftItems = sorted.filter((item) => item.x + item.width / 2 < midpoint);
+    const rightItems = sorted.filter((item) => item.x + item.width / 2 >= midpoint);
+    const maxLeftEnd = Math.max(...leftItems.map((item) => item.x + item.width), 0);
+    const minRightStart = Math.min(...rightItems.map((item) => item.x), Number.POSITIVE_INFINITY);
+
+    if (leftItems.length && rightItems.length && minRightStart - maxLeftEnd > 18) {
+      return [buildLine(leftItems, y, "left"), buildLine(rightItems, y, "right")].filter(
+        (line) => line.text
+      );
+    }
+  }
+
+  return [buildLine(sorted, y, "auto")].filter((line) => line.text);
+}
+
+function buildLine(items, y, side) {
+  const text = items
+    .map((item) => item.text)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const minX = Math.min(...items.map((item) => item.x));
+  const maxX = Math.max(...items.map((item) => item.x + item.width));
+  return {
+    y,
+    minX,
+    maxX,
+    side,
+    text
+  };
+}
+
+function hasTwoColumnLayout(lines, pageWidth) {
+  if (!pageWidth) return false;
+  const midpoint = pageWidth / 2;
+  const narrowLines = lines.filter((line) => line.maxX - line.minX < pageWidth * 0.62);
+  const leftCount = narrowLines.filter((line) => line.maxX < midpoint + pageWidth * 0.08).length;
+  const rightCount = narrowLines.filter((line) => line.minX > midpoint - pageWidth * 0.08).length;
+  return leftCount >= 8 && rightCount >= 8;
+}
+
+function orderTwoColumnLines(lines, pageWidth) {
+  const midpoint = pageWidth / 2;
+  const columnLines = lines.filter((line) => line.maxX - line.minX < pageWidth * 0.7);
+  const highestColumnY = Math.max(...columnLines.map((line) => line.y), Number.NEGATIVE_INFINITY);
+  const preamble = lines.filter(
+    (line) => line.y > highestColumnY + 4 || line.maxX - line.minX >= pageWidth * 0.7
+  );
+  const body = lines.filter((line) => !preamble.includes(line));
+  const left = body.filter((line) => line.minX < midpoint);
+  const right = body.filter((line) => line.minX >= midpoint);
+
+  return [
+    ...orderLinesTopDown(preamble),
+    ...orderLinesTopDown(left),
+    { text: "" },
+    ...orderLinesTopDown(right)
+  ];
+}
+
+function orderLinesTopDown(lines) {
+  return lines
+    .slice()
+    .sort((a, b) => b.y - a.y || a.minX - b.minX)
+    .map((line) => ({ ...line, text: dehyphenateLine(line.text) }));
+}
+
+function dehyphenateLine(text) {
+  return text.replace(/([A-Za-z])-\s+([a-z])/g, "$1$2");
+}
+
+function splitTextBlocks(text, maxChars = 1400) {
+  const blocks = [];
+  let current = "";
+
+  for (const line of text.split("\n")) {
+    if (!line.trim()) {
+      if (current.trim()) {
+        blocks.push(current.trim());
+        current = "";
+      }
+      continue;
+    }
+
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length > maxChars && current.trim()) {
+      blocks.push(current.trim());
+      current = line;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current.trim()) blocks.push(current.trim());
+  return blocks;
 }
 
 function markdownToSegments(markdown) {
