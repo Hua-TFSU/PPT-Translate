@@ -16,6 +16,11 @@ const directions = [
   { label: "英译中", source: "en", target: "zh" }
 ];
 
+const languageLabels = {
+  zh: "中文",
+  en: "English"
+};
+
 const ocrModes = [
   { label: "自动", value: "auto" },
   { label: "Mathpix", value: "mathpix" },
@@ -41,6 +46,7 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [redrawingId, setRedrawingId] = useState("");
   const [jobs, setJobs] = useState([]);
+  const [appInfo, setAppInfo] = useState(null);
   const [keyStatus, setKeyStatus] = useState(null);
   const [keyForm, setKeyForm] = useState({
     preferredProvider: "auto",
@@ -56,6 +62,8 @@ function App() {
   const segments = useMemo(() => job?.result?.segments || [], [job]);
   const imageItems = useMemo(() => job?.result?.images || [], [job]);
   const formulaSummary = job?.result?.formulaSummary;
+  const warnings = job?.result?.warnings || [];
+  const isUntranslated = warnings.some((warning) => warning.includes("not a translated result"));
 
   async function refreshJobs() {
     const response = await fetch("/api/jobs");
@@ -68,7 +76,13 @@ function App() {
   useEffect(() => {
     refreshJobs().catch(() => undefined);
     refreshKeyStatus().catch(() => undefined);
+    refreshHealth().catch(() => undefined);
   }, []);
+
+  async function refreshHealth() {
+    const response = await fetch("/api/health");
+    if (response.ok) setAppInfo(await response.json());
+  }
 
   async function refreshKeyStatus() {
     const response = await fetch("/api/settings/model-keys");
@@ -191,6 +205,7 @@ function App() {
           <div>
             <p className="eyebrow">PPT-Translate</p>
             <h1>PPT / PDF 翻译工作台</h1>
+            {appInfo?.version && <p className="versionText">v{appInfo.version}</p>}
           </div>
           <button className="iconButton" type="button" onClick={refreshJobs} aria-label="刷新任务">
             <RefreshCcw size={18} />
@@ -355,10 +370,12 @@ function App() {
                 <div className="sectionTitle">译文</div>
                 <p className="muted">
                   {job ? `${statusLabel(job.status)} · ${job.filename}` : "等待上传"}
+                  {job ? ` · ${languageLabels[job.sourceLang] || job.sourceLang} -> ${languageLabels[job.targetLang] || job.targetLang}` : ""}
                   {formulaSummary
                     ? ` · 公式${formulaSummary.ok ? "一致" : "有差异"} ${formulaSummary.totalFormulas - formulaSummary.missingFormulas}/${formulaSummary.totalFormulas}`
                     : ""}
                 </p>
+                {isUntranslated && <p className="warningText">未配置模型 Key，当前结果不是译文。</p>}
               </div>
               <div className="exportButtons">
                 <a className={!canExport ? "disabled" : ""} href={exportUrl("markdown")}>

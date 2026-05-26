@@ -26,7 +26,9 @@ app.use(express.json({ limit: "2mb" }));
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (_request, file, callback) => {
-    const safeName = file.originalname.replace(/[^\w.\-\u4e00-\u9fa5]/g, "_");
+    const originalName = normalizeUploadedFilename(file.originalname);
+    file.originalname = originalName;
+    const safeName = originalName.replace(/[^\w.\-\u4e00-\u9fa5]/g, "_");
     callback(null, `${Date.now()}-${safeName}`);
   }
 });
@@ -42,6 +44,7 @@ app.get("/api/health", (_request, response) => {
   response.json({
     ok: true,
     service: "ppt-translate",
+    version: "0.1.2",
     timestamp: new Date().toISOString()
   });
 });
@@ -91,7 +94,9 @@ app.post("/api/uploads", upload.single("file"), async (request, response) => {
     return;
   }
 
-  const extension = path.extname(request.file.originalname).toLowerCase();
+  const filename = normalizeUploadedFilename(request.file.originalname);
+  request.file.originalname = filename;
+  const extension = path.extname(filename).toLowerCase();
   if (![".pptx", ".pdf"].includes(extension)) {
     await fs.rm(request.file.path, { force: true });
     response.status(400).json({ error: "Only PPTX and PDF files are supported" });
@@ -99,7 +104,7 @@ app.post("/api/uploads", upload.single("file"), async (request, response) => {
   }
 
   const job = createJob({
-    filename: request.file.originalname,
+    filename,
     storedFilename: request.file.filename,
     filepath: request.file.path,
     mimetype: request.file.mimetype,
@@ -265,7 +270,9 @@ async function processJob(jobId) {
 
     const warnings = [...(extracted.warnings || [])];
     if (translatedSegments.some((segment) => segment.provider === "unconfigured")) {
-      warnings.push("No translation provider is configured, so original text was preserved.");
+      warnings.push(
+        "No translation provider is configured. The output preserves the original text and is not a translated result."
+      );
     }
     const formulaWarnings = translatedSegments
       .filter((segment) => segment.formulaCheck && !segment.formulaCheck.ok)
@@ -308,6 +315,20 @@ function summarizeFormulaChecks(segments = []) {
     totalFormulas,
     missingFormulas
   };
+}
+
+function normalizeUploadedFilename(filename = "") {
+  const value = String(filename || "upload");
+  if (!looksLikeMojibake(value)) return value;
+  try {
+    return Buffer.from(value, "latin1").toString("utf8");
+  } catch {
+    return value;
+  }
+}
+
+function looksLikeMojibake(value) {
+  return /[ÃÂÆÇÐÑØÙÝÞßà-ÿ]/.test(value) || /[äåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ]/.test(value);
 }
 
 function attachImageTranslations(images = [], segments = []) {

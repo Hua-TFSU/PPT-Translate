@@ -27,4 +27,6 @@ services:
       - key: MATHPIX_APP_KEY
         sync: false
       - key: ENABLE_LOCAL_OCR
-        value: "false"
+        value: "true"
+      - key: TESSERACT_LANG
+        value: eng+chi_sim

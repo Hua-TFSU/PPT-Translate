@@ -62,6 +62,13 @@ h1 {
   letter-spacing: 0;
 }
 
+.versionText {
+  margin: 8px 0 0;
+  color: #66736f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
@@ -309,6 +316,12 @@ h1 {
 
 .resultHeader p {
   margin: 0;
+}
+
+.warningText {
+  margin-top: 6px !important;
+  color: #9a4b00;
+  font-weight: 800;
 }
 
 .exportButtons {

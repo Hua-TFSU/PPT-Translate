@@ -273,7 +273,8 @@ async function extractSlideImages(zip, slidePath, slideNumberLabel, ocrMode, war
 
     const shouldUseMathpix = (ocrMode === "mathpix" || ocrMode === "auto") && hasMathpixCredentials();
     const shouldUseLocal =
-      ocrMode === "local" || (ocrMode === "auto" && process.env.ENABLE_LOCAL_OCR === "true");
+      ocrMode === "local" ||
+      (ocrMode === "auto" && process.env.ENABLE_LOCAL_OCR !== "false");
 
     try {
       if (shouldUseMathpix) {
@@ -286,6 +287,9 @@ async function extractSlideImages(zip, slidePath, slideNumberLabel, ocrMode, war
         image.ocrProvider = "not configured";
       } else {
         image.ocrProvider = "skipped";
+        warnings.push(
+          `${image.location} OCR skipped. Enable Mathpix credentials or local OCR to recognize image text.`
+        );
       }
     } catch (error) {
       image.ocrProvider = "failed";
@@ -305,7 +309,13 @@ function normalizeArray(value) {
 
 async function recognizeImageWithTesseract(buffer) {
   const { recognize } = await import("tesseract.js");
-  const language = process.env.TESSERACT_LANG || "eng+chi_sim";
-  const result = await recognize(buffer, language);
-  return result.data?.text || "";
+  const preferredLanguage = process.env.TESSERACT_LANG || "eng+chi_sim";
+  try {
+    const result = await recognize(buffer, preferredLanguage);
+    return result.data?.text || "";
+  } catch (error) {
+    if (preferredLanguage === "eng") throw error;
+    const fallback = await recognize(buffer, "eng");
+    return fallback.data?.text || "";
+  }
 }
