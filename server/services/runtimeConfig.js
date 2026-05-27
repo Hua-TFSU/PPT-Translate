@@ -26,6 +26,11 @@ const runtimeConfig = {
     secretAccessKey: "",
     region: ""
   },
+  baiduOcr: {
+    apiKey: "",
+    secretKey: "",
+    endpoint: ""
+  },
   glossary: []
 };
 
@@ -90,6 +95,18 @@ export function updateModelKeys(input = {}) {
     runtimeConfig.awsTextract.region = input.awsRegion.trim();
   }
 
+  if (typeof input.baiduApiKey === "string" && input.baiduApiKey.trim()) {
+    runtimeConfig.baiduOcr.apiKey = input.baiduApiKey.trim();
+  }
+
+  if (typeof input.baiduSecretKey === "string" && input.baiduSecretKey.trim()) {
+    runtimeConfig.baiduOcr.secretKey = input.baiduSecretKey.trim();
+  }
+
+  if (typeof input.baiduEndpoint === "string" && input.baiduEndpoint.trim()) {
+    runtimeConfig.baiduOcr.endpoint = input.baiduEndpoint.trim();
+  }
+
   if (input.clearOpenAI === true) {
     runtimeConfig.openai.apiKey = "";
   }
@@ -115,6 +132,11 @@ export function updateModelKeys(input = {}) {
   if (input.clearAws === true) {
     runtimeConfig.awsTextract.accessKeyId = "";
     runtimeConfig.awsTextract.secretAccessKey = "";
+  }
+
+  if (input.clearBaidu === true) {
+    runtimeConfig.baiduOcr.apiKey = "";
+    runtimeConfig.baiduOcr.secretKey = "";
   }
 
   return getModelKeyStatus();
@@ -191,10 +213,19 @@ export function getAwsTextractConfig() {
   };
 }
 
+export function getBaiduOcrConfig() {
+  return {
+    apiKey: runtimeConfig.baiduOcr.apiKey || process.env.BAIDU_OCR_API_KEY || "",
+    secretKey: runtimeConfig.baiduOcr.secretKey || process.env.BAIDU_OCR_SECRET_KEY || "",
+    endpoint: runtimeConfig.baiduOcr.endpoint || process.env.BAIDU_OCR_ENDPOINT || "accurate_basic"
+  };
+}
+
 export function getModelKeyStatus() {
   const providerConfig = getProviderConfig();
   const azureConfig = getAzureOcrConfig();
   const awsConfig = getAwsTextractConfig();
+  const baiduConfig = getBaiduOcrConfig();
   return {
     preferredProvider: providerConfig.preferredProvider,
     openai: {
@@ -259,6 +290,18 @@ export function getModelKeyStatus() {
       accessKeyPreview: maskKey(awsConfig.accessKeyId),
       secretKeyPreview: maskKey(awsConfig.secretAccessKey),
       region: awsConfig.region
+    },
+    baiduOcr: {
+      configured: Boolean(baiduConfig.apiKey && baiduConfig.secretKey),
+      source:
+        runtimeConfig.baiduOcr.apiKey || runtimeConfig.baiduOcr.secretKey
+          ? "runtime"
+          : process.env.BAIDU_OCR_API_KEY || process.env.BAIDU_OCR_SECRET_KEY
+            ? "env"
+            : "none",
+      apiKeyPreview: maskKey(baiduConfig.apiKey),
+      secretKeyPreview: maskKey(baiduConfig.secretKey),
+      endpoint: baiduConfig.endpoint
     }
   };
 }

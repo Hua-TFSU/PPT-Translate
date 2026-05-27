@@ -1,5 +1,7 @@
 import { DetectDocumentTextCommand, TextractClient } from "@aws-sdk/client-textract";
-import { getAwsTextractConfig, getAzureOcrConfig } from "./runtimeConfig.js";
+import { getAwsTextractConfig, getAzureOcrConfig, getBaiduOcrConfig } from "./runtimeConfig.js";
+
+let baiduTokenCache = null;
 
 export function hasAzureOcrCredentials() {
   const config = getAzureOcrConfig();
@@ -9,6 +11,11 @@ export function hasAzureOcrCredentials() {
 export function hasAwsTextractCredentials() {
   const config = getAwsTextractConfig();
   return Boolean(config.accessKeyId && config.secretAccessKey && config.region);
+}
+
+export function hasBaiduOcrCredentials() {
+  const config = getBaiduOcrConfig();
+  return Boolean(config.apiKey && config.secretKey);
 }
 
 export async function recognizeDocumentWithAzure(buffer, mimeType = "application/octet-stream") {
@@ -93,6 +100,43 @@ export async function recognizeDocumentWithAwsTextract(buffer) {
   return awsBlocksToText(result.Blocks || []);
 }
 
+export async function recognizeDocumentWithBaidu(buffer, mimeType = "application/octet-stream") {
+  const config = getBaiduOcrConfig();
+  if (!hasBaiduOcrCredentials()) {
+    throw new Error("Baidu OCR credentials are not configured");
+  }
+
+  const accessToken = await getBaiduAccessToken(config);
+  const endpoint = config.endpoint || "accurate_basic";
+  const ocrUrl = new URL(`https://aip.baidubce.com/rest/2.0/ocr/v1/${endpoint}`);
+  ocrUrl.searchParams.set("access_token", accessToken);
+
+  const body = new URLSearchParams();
+  if (mimeType === "application/pdf") {
+    body.set("pdf_file", buffer.toString("base64"));
+  } else {
+    body.set("image", buffer.toString("base64"));
+  }
+  body.set("language_type", "CHN_ENG");
+  body.set("detect_direction", "true");
+  body.set("paragraph", "false");
+
+  const response = await fetch(ocrUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body
+  });
+
+  const payload = await response.json();
+  if (!response.ok || payload.error_code) {
+    throw new Error(`Baidu OCR failed: ${payload.error_code || response.status} ${payload.error_msg || ""}`.trim());
+  }
+
+  return baiduWordsToText(payload.words_result || []);
+}
+
 function azureResultToText(payload) {
   const result = payload.analyzeResult || payload;
   if (result.content?.trim()) return result.content.trim();
@@ -110,6 +154,39 @@ function awsBlocksToText(blocks) {
     .filter((block) => block.BlockType === "LINE" && block.Text)
     .sort((a, b) => (a.Page || 0) - (b.Page || 0))
     .map((block) => block.Text)
+    .join("\n")
+    .trim();
+}
+
+async function getBaiduAccessToken(config) {
+  const cacheKey = `${config.apiKey}:${config.secretKey}`;
+  if (baiduTokenCache?.cacheKey === cacheKey && baiduTokenCache.expiresAt > Date.now() + 60_000) {
+    return baiduTokenCache.token;
+  }
+
+  const tokenUrl = new URL("https://aip.baidubce.com/oauth/2.0/token");
+  tokenUrl.searchParams.set("grant_type", "client_credentials");
+  tokenUrl.searchParams.set("client_id", config.apiKey);
+  tokenUrl.searchParams.set("client_secret", config.secretKey);
+
+  const response = await fetch(tokenUrl, { method: "POST" });
+  const payload = await response.json();
+  if (!response.ok || !payload.access_token) {
+    throw new Error(`Baidu token failed: ${payload.error || response.status} ${payload.error_description || ""}`.trim());
+  }
+
+  baiduTokenCache = {
+    cacheKey,
+    token: payload.access_token,
+    expiresAt: Date.now() + Number(payload.expires_in || 0) * 1000
+  };
+  return baiduTokenCache.token;
+}
+
+function baiduWordsToText(words) {
+  return words
+    .map((item) => item.words)
+    .filter(Boolean)
     .join("\n")
     .trim();
 }

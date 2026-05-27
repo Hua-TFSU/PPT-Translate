@@ -44,6 +44,12 @@ services:
         sync: false
       - key: AWS_TEXTRACT_REGION
         value: us-east-1
+      - key: BAIDU_OCR_API_KEY
+        sync: false
+      - key: BAIDU_OCR_SECRET_KEY
+        sync: false
+      - key: BAIDU_OCR_ENDPOINT
+        value: accurate_basic
       - key: ENABLE_LOCAL_OCR
         value: "true"
       - key: TESSERACT_LANG

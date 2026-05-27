@@ -6,8 +6,10 @@ import { nanoid } from "nanoid";
 import {
   hasAwsTextractCredentials,
   hasAzureOcrCredentials,
+  hasBaiduOcrCredentials,
   recognizeDocumentWithAwsTextract,
-  recognizeDocumentWithAzure
+  recognizeDocumentWithAzure,
+  recognizeDocumentWithBaidu
 } from "./cloudOcr.js";
 import {
   convertPdfWithMathpix,
@@ -99,6 +101,21 @@ async function extractPdf(filepath, filename, ocrMode) {
 
   if (ocrMode === "aws") {
     warnings.push("AWS Textract is selected but credentials are not configured.");
+  }
+
+  if ((ocrMode === "baidu" || ocrMode === "auto") && hasBaiduOcrCredentials()) {
+    const text = await recognizeDocumentWithBaidu(buffer, "application/pdf");
+    return {
+      type: "pdf",
+      extractor: "baidu-ocr",
+      segments: text ? textToSegments(text, "Baidu OCR Block") : [],
+      images: [],
+      warnings
+    };
+  }
+
+  if (ocrMode === "baidu") {
+    warnings.push("Baidu OCR is selected but credentials are not configured.");
   }
 
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -522,13 +539,15 @@ async function extractSlideImages(
     const shouldUseMathpix = (ocrMode === "mathpix" || ocrMode === "auto") && hasMathpixCredentials();
     const shouldUseAzure = (ocrMode === "azure" || ocrMode === "auto") && hasAzureOcrCredentials();
     const shouldUseAws = (ocrMode === "aws" || ocrMode === "auto") && hasAwsTextractCredentials();
+    const shouldUseBaidu = (ocrMode === "baidu" || ocrMode === "auto") && hasBaiduOcrCredentials();
     const shouldUseLocal =
       ocrMode === "local" ||
       (ocrMode === "auto" &&
         process.env.ENABLE_LOCAL_OCR !== "false" &&
         !shouldUseMathpix &&
         !shouldUseAzure &&
-        !shouldUseAws);
+        !shouldUseAws &&
+        !shouldUseBaidu);
 
     try {
       if (shouldUseMathpix) {
@@ -540,10 +559,13 @@ async function extractSlideImages(
       } else if (shouldUseAws) {
         image.ocrText = await recognizeDocumentWithAwsTextract(imageBuffer);
         image.ocrProvider = "aws-textract";
+      } else if (shouldUseBaidu) {
+        image.ocrText = await recognizeDocumentWithBaidu(imageBuffer, mimeType);
+        image.ocrProvider = "baidu-ocr";
       } else if (shouldUseLocal) {
         image.ocrText = await recognizeImageWithTesseract(imageBuffer);
         image.ocrProvider = "tesseract.js";
-      } else if (["mathpix", "azure", "aws"].includes(ocrMode)) {
+      } else if (["mathpix", "azure", "aws", "baidu"].includes(ocrMode)) {
         image.ocrProvider = "not configured";
       } else {
         image.ocrProvider = "skipped";

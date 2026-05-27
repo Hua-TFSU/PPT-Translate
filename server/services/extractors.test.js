@@ -170,7 +170,10 @@ describe("document pipeline", () => {
       azureModel: "prebuilt-read",
       awsAccessKeyId: "AKIATESTKEY",
       awsSecretAccessKey: "aws-secret-test-key",
-      awsRegion: "us-west-2"
+      awsRegion: "us-west-2",
+      baiduApiKey: "baidu-api-test-key",
+      baiduSecretKey: "baidu-secret-test-key",
+      baiduEndpoint: "accurate_basic"
     });
 
     expect(status.preferredProvider).toBe("deepseek");
@@ -184,10 +187,14 @@ describe("document pipeline", () => {
     expect(status.azureOcr.keyPreview).toBe("azu...-key");
     expect(status.awsTextract.configured).toBe(true);
     expect(status.awsTextract.secretKeyPreview).toBe("aws...-key");
+    expect(status.baiduOcr.configured).toBe(true);
+    expect(status.baiduOcr.apiKeyPreview).toBe("bai...-key");
+    expect(status.baiduOcr.secretKeyPreview).toBe("bai...-key");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("deepseek-test");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("doubao-test");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("mathpix-secret");
     expect(JSON.stringify(getModelKeyStatus())).not.toContain("aws-secret-test");
+    expect(JSON.stringify(getModelKeyStatus())).not.toContain("baidu-secret-test");
 
     updateModelKeys({
       clearDeepSeek: true,
@@ -195,6 +202,7 @@ describe("document pipeline", () => {
       clearMathpix: true,
       clearAzure: true,
       clearAws: true,
+      clearBaidu: true,
       preferredProvider: "auto"
     });
   });

@@ -32,6 +32,7 @@ const ocrModes = [
   { label: "Mathpix", value: "mathpix" },
   { label: "Azure AI", value: "azure" },
   { label: "AWS Textract", value: "aws" },
+  { label: "Baidu OCR", value: "baidu" },
   { label: "本地 OCR", value: "local" },
   { label: "仅文本", value: "text" }
 ];
@@ -51,7 +52,10 @@ const emptyKeyForm = {
   azureModel: "prebuilt-read",
   awsAccessKeyId: "",
   awsSecretAccessKey: "",
-  awsRegion: "us-east-1"
+  awsRegion: "us-east-1",
+  baiduApiKey: "",
+  baiduSecretKey: "",
+  baiduEndpoint: "accurate_basic"
 };
 
 const emptyTerm = { source: "", target: "", note: "" };
@@ -63,7 +67,8 @@ const keyProviderOptions = [
   { value: "doubao", label: "字节豆包" },
   { value: "mathpix", label: "Mathpix" },
   { value: "azure", label: "Azure AI" },
-  { value: "aws", label: "AWS Textract" }
+  { value: "aws", label: "AWS Textract" },
+  { value: "baidu", label: "Baidu OCR" }
 ];
 
 function statusLabel(status) {
@@ -163,7 +168,8 @@ function App() {
         doubaoModel: payload.doubao?.model || current.doubaoModel,
         azureEndpoint: payload.azureOcr?.endpoint || current.azureEndpoint,
         azureModel: payload.azureOcr?.model || current.azureModel,
-        awsRegion: payload.awsTextract?.region || current.awsRegion
+        awsRegion: payload.awsTextract?.region || current.awsRegion,
+        baiduEndpoint: payload.baiduOcr?.endpoint || current.baiduEndpoint
       }));
     }
   }
@@ -181,7 +187,8 @@ function App() {
         doubaoApiKey: "",
         mathpixAppKey: "",
         azureApiKey: "",
-        awsSecretAccessKey: ""
+        awsSecretAccessKey: "",
+        baiduSecretKey: ""
       }));
       await fetch("/api/settings/model-keys", {
         method: "PUT",
@@ -330,7 +337,10 @@ function App() {
       ...(keyForm.azureModel.trim() ? { azureModel: keyForm.azureModel.trim() } : {}),
       ...(keyForm.awsAccessKeyId.trim() ? { awsAccessKeyId: keyForm.awsAccessKeyId.trim() } : {}),
       ...(keyForm.awsSecretAccessKey.trim() ? { awsSecretAccessKey: keyForm.awsSecretAccessKey.trim() } : {}),
-      ...(keyForm.awsRegion.trim() ? { awsRegion: keyForm.awsRegion.trim() } : {})
+      ...(keyForm.awsRegion.trim() ? { awsRegion: keyForm.awsRegion.trim() } : {}),
+      ...(keyForm.baiduApiKey.trim() ? { baiduApiKey: keyForm.baiduApiKey.trim() } : {}),
+      ...(keyForm.baiduSecretKey.trim() ? { baiduSecretKey: keyForm.baiduSecretKey.trim() } : {}),
+      ...(keyForm.baiduEndpoint.trim() ? { baiduEndpoint: keyForm.baiduEndpoint.trim() } : {})
     };
 
     try {
@@ -350,7 +360,8 @@ function App() {
         doubaoApiKey: "",
         mathpixAppKey: "",
         azureApiKey: "",
-        awsSecretAccessKey: ""
+        awsSecretAccessKey: "",
+        baiduSecretKey: ""
       }));
     } catch (keyError) {
       setError(keyError.message);
@@ -562,35 +573,77 @@ function App() {
       );
     }
 
+    if (activeKeyProvider === "aws") {
+      return (
+        <>
+          <label className="keyField">
+            AWS Access Key ID
+            <input
+              placeholder={keyStatus?.awsTextract?.configured ? keyStatus.awsTextract.accessKeyPreview : "AKIA..."}
+              value={keyForm.awsAccessKeyId}
+              onChange={(event) => setKeyForm((current) => ({ ...current, awsAccessKeyId: event.target.value }))}
+            />
+          </label>
+          <label className="keyField">
+            AWS Secret Access Key
+            <input
+              type="password"
+              placeholder={keyStatus?.awsTextract?.configured ? keyStatus.awsTextract.secretKeyPreview : "secret"}
+              value={keyForm.awsSecretAccessKey}
+              onChange={(event) =>
+                setKeyForm((current) => ({ ...current, awsSecretAccessKey: event.target.value }))
+              }
+            />
+          </label>
+          <label className="keyField">
+            AWS Region
+            <input
+              value={keyForm.awsRegion}
+              onChange={(event) => setKeyForm((current) => ({ ...current, awsRegion: event.target.value }))}
+            />
+          </label>
+          <a
+            className="secondaryLink"
+            href="https://console.aws.amazon.com/textract/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <ExternalLink size={15} />
+            打开 AWS Textract
+          </a>
+        </>
+      );
+    }
+
     return (
       <>
         <label className="keyField">
-          AWS Access Key ID
+          Baidu OCR API Key
           <input
-            placeholder={keyStatus?.awsTextract?.configured ? keyStatus.awsTextract.accessKeyPreview : "AKIA..."}
-            value={keyForm.awsAccessKeyId}
-            onChange={(event) => setKeyForm((current) => ({ ...current, awsAccessKeyId: event.target.value }))}
+            placeholder={keyStatus?.baiduOcr?.configured ? keyStatus.baiduOcr.apiKeyPreview : "API Key"}
+            value={keyForm.baiduApiKey}
+            onChange={(event) => setKeyForm((current) => ({ ...current, baiduApiKey: event.target.value }))}
           />
         </label>
         <label className="keyField">
-          AWS Secret Access Key
+          Baidu OCR Secret Key
           <input
             type="password"
-            placeholder={keyStatus?.awsTextract?.configured ? keyStatus.awsTextract.secretKeyPreview : "secret"}
-            value={keyForm.awsSecretAccessKey}
-            onChange={(event) => setKeyForm((current) => ({ ...current, awsSecretAccessKey: event.target.value }))}
+            placeholder={keyStatus?.baiduOcr?.configured ? keyStatus.baiduOcr.secretKeyPreview : "Secret Key"}
+            value={keyForm.baiduSecretKey}
+            onChange={(event) => setKeyForm((current) => ({ ...current, baiduSecretKey: event.target.value }))}
           />
         </label>
         <label className="keyField">
-          AWS Region
+          Baidu OCR 接口
           <input
-            value={keyForm.awsRegion}
-            onChange={(event) => setKeyForm((current) => ({ ...current, awsRegion: event.target.value }))}
+            value={keyForm.baiduEndpoint}
+            onChange={(event) => setKeyForm((current) => ({ ...current, baiduEndpoint: event.target.value }))}
           />
         </label>
-        <a className="secondaryLink" href="https://console.aws.amazon.com/textract/" target="_blank" rel="noreferrer">
+        <a className="secondaryLink" href="https://console.bce.baidu.com/ai/#/ai/ocr/app/list" target="_blank" rel="noreferrer">
           <ExternalLink size={15} />
-          打开 AWS Textract
+          打开百度 OCR 控制台
         </a>
       </>
     );

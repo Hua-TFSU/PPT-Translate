@@ -10,11 +10,11 @@ PPT-Translate is an initial PPTX/PDF translation platform. It accepts presentati
 - PPTX image asset extraction with optional local OCR through `tesseract.js`.
 - PPTX image previews in the OCR panel through `/api/jobs/:jobId/images/:imageId/original`.
 - PDF text-layer extraction through `pdfjs-dist`.
-- OCR provider integration path for Mathpix, Azure AI Document Intelligence, AWS Textract, and local Tesseract.
+- OCR provider integration path for Mathpix, Azure AI Document Intelligence, AWS Textract, Baidu OCR, and local Tesseract.
 - Login and registration screen for the web workspace, with browser-side persistence of each user's runtime keys and glossary.
 - Translation provider chain: OpenAI, DeepSeek, Doubao, DeepL, then a safe unconfigured fallback.
 - Formula guard for math-heavy PDFs: formula-like snippets are replaced with placeholders before translation and restored exactly afterward, with a consistency summary in exports.
-- Runtime key API for OpenAI, DeepSeek, Doubao, Mathpix, Azure AI, and AWS Textract credentials.
+- Runtime key API for OpenAI, DeepSeek, Doubao, Mathpix, Azure AI, AWS Textract, and Baidu OCR credentials.
 - Glossary API and UI. Saved terms are sent to the model prompt and enforced during translation.
 - Export API: JSON, Markdown, DOCX, PDF.
 - Redraw API for OCR-recognized PPT images, producing an editable SVG replacement.
@@ -88,7 +88,10 @@ curl -X PUT http://localhost:4000/api/settings/model-keys \
     "azureModel": "prebuilt-read",
     "awsAccessKeyId": "...",
     "awsSecretAccessKey": "...",
-    "awsRegion": "us-east-1"
+    "awsRegion": "us-east-1",
+    "baiduApiKey": "...",
+    "baiduSecretKey": "...",
+    "baiduEndpoint": "accurate_basic"
   }'
 ```
 
@@ -122,6 +125,8 @@ curl -X PUT http://localhost:4000/api/settings/glossary \
 | `AZURE_DOCUMENT_INTELLIGENCE_MODEL` | Azure model, defaults to `prebuilt-read`. |
 | `AWS_TEXTRACT_ACCESS_KEY_ID` / `AWS_TEXTRACT_SECRET_ACCESS_KEY` | Enables AWS Textract OCR. |
 | `AWS_TEXTRACT_REGION` | AWS region, defaults to `us-east-1`. |
+| `BAIDU_OCR_API_KEY` / `BAIDU_OCR_SECRET_KEY` | Enables Baidu OCR. |
+| `BAIDU_OCR_ENDPOINT` | Baidu OCR endpoint name, defaults to `accurate_basic`. |
 | `ENABLE_LOCAL_OCR` | Enables slower local OCR for extracted PPT image assets. |
 | `TESSERACT_LANG` | OCR language pack, defaults to `eng+chi_sim`. |
 
@@ -130,7 +135,8 @@ curl -X PUT http://localhost:4000/api/settings/glossary \
 - Mathpix is the best fit when formula-to-LaTeX or math-heavy PDF restoration matters most.
 - Azure AI Document Intelligence Read is a strong general OCR option for PDFs, scans, and mixed document layouts.
 - AWS Textract is strong for document text extraction, tables, forms, and enterprise AWS deployments.
-- Baidu OCR and Alibaba Cloud OCR are good China-region alternatives. Baidu has mature high-accuracy OCR SKUs; Alibaba has document OCR and unified recognition APIs. They are not wired into this MVP yet because their signing and billing flows differ from the current provider set.
+- Baidu OCR is wired into this MVP through API Key / Secret Key token exchange. `accurate_basic` is the default high-accuracy endpoint, and `general_basic` can be used if that SKU is unavailable.
+- Alibaba Cloud OCR remains a good China-region alternative with document OCR and unified recognition APIs, but it is not wired into this MVP yet because its signing and product model differ from the current provider set.
 
 ## Deploy To Render
 
